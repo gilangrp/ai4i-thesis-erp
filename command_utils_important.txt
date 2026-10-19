@@ -1,0 +1,102 @@
+# ==============================================================================
+# COMMAND UTILS IMPORTANT (CLICKHOUSE & POSTGRESQL)
+# Kumpulan perintah penting manajemen service & database di server/VPS
+# ==============================================================================
+
+
+# ==============================================================================
+# 1. CLICKHOUSE
+# ==============================================================================
+
+# --- Manajemen Service (Start, Stop, Restart, Status) ---
+# Menjalankan ClickHouse
+sudo systemctl start clickhouse-server
+
+# Menghentikan ClickHouse
+sudo systemctl stop clickhouse-server
+
+# Restart ClickHouse
+sudo systemctl restart clickhouse-server
+
+# Cek status ClickHouse
+sudo systemctl status clickhouse-server
+sudo systemctl --no-pager --full status clickhouse-server
+
+# --- Enable / Disable Auto-Run saat Boot / Restart VPS ---
+# Mencegah ClickHouse otomatis berjalan saat VPS restart
+sudo systemctl disable clickhouse-server
+
+# Mengaktifkan ClickHouse agar otomatis berjalan saat VPS restart
+sudo systemctl enable clickhouse-server
+
+# Enable dan langsung jalankan sekaligus
+sudo systemctl enable --now clickhouse-server
+
+# --- ClickHouse Client & Query CLI ---
+# Masuk interaktif default
+clickhouse-client
+
+# Masuk dengan user default
+clickhouse-client --user default
+
+# Masuk dengan user default dan prompt password
+clickhouse-client --user default --password
+
+# Eksekusi query langsung dari CLI
+clickhouse-client --query "SHOW DATABASES"
+clickhouse-client --query "SELECT version()"
+
+
+# ==============================================================================
+# 2. POSTGRESQL
+# ==============================================================================
+
+# --- Manajemen Service (Start, Stop, Restart, Status) ---
+# Menjalankan PostgreSQL
+sudo systemctl start postgresql
+
+# Menghentikan PostgreSQL
+sudo systemctl stop postgresql
+
+# Restart PostgreSQL
+sudo systemctl restart postgresql
+
+# Cek status PostgreSQL
+sudo systemctl status postgresql
+sudo systemctl --no-pager --full status postgresql
+
+# --- Enable / Disable Auto-Run saat Boot / Restart VPS ---
+# Mencegah PostgreSQL otomatis berjalan saat VPS restart
+sudo systemctl disable postgresql
+
+# Mengaktifkan PostgreSQL agar otomatis berjalan saat VPS restart
+sudo systemctl enable postgresql
+
+# Enable dan langsung jalankan sekaligus
+sudo systemctl enable --now postgresql
+
+# --- PostgreSQL Client (psql) & Query CLI ---
+# Masuk ke shell psql sebagai user postgres (paling umum)
+sudo -u postgres psql
+
+# Masuk dengan user postgres (prompt password jika dikonfigurasi)
+psql -U postgres -W
+
+# Cek versi PostgreSQL
+psql --version
+
+# Eksekusi command/query langsung dari CLI (contoh list database)
+sudo -u postgres psql -c "\l"
+
+
+# ==============================================================================
+# 3. MONITORING RESOURCE & CEK STATUS CEPAT
+# ==============================================================================
+
+# Cek apakah service sedang aktif (active / inactive)
+sudo systemctl is-active clickhouse-server
+sudo systemctl is-active postgresql
+
+# Cek pemakaian RAM dan Disk
+free -h
+df -h /
