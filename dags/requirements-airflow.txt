@@ -1,0 +1,3 @@
+# Pasang di environment Airflow (bukan .venv project)
+oracledb
+clickhouse-connect

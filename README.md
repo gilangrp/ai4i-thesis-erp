@@ -33,12 +33,16 @@ machine-failure-mlops/
 ├── notebooks/
 │   └── SMOTE_ai4i2020_xgboost_machine_failure.ipynb   # training + log ke MLflow
 ├── scripts/
+│   ├── build_explorer.py                  # bangun ui/project_explorer.html
 │   ├── csv_to_oracle_insert.py            # CSV -> INSERT INTO Oracle
 │   ├── trigger_airflow_dag.py             # trigger + tunggu DAG via REST API
 │   └── deploy_remote.sh                   # dijalankan di server oleh workflow
 ├── serving/app.py                         # FastAPI, model dari MLflow Registry
 ├── sql/insert_ai4i2020.sql                # hasil generate (tabel AI4I_2020)
-├── ui/dummy_dashboard.html                # contoh tampilan, tanpa koneksi apa pun
+├── ui/
+│   ├── dummy_dashboard.html               # contoh form prediksi
+│   ├── pipeline_monitor.html              # contoh status pipeline + model registry
+│   └── project_explorer.html              # daftar file project + isinya
 ├── runs/                                  # hasil eksekusi notebook (papermill)
 ├── ecosystem.config.js                    # konfigurasi pm2
 ├── requirements.txt
@@ -144,6 +148,11 @@ Prasyarat: server punya akses `git fetch` ke repo (deploy key), `pm2`, `curl`, d
 ## 6. UI
 
 `ui/dummy_dashboard.html` bisa dibuka langsung di browser. Isinya form sensor, gauge probabilitas dengan penanda threshold, tiga indikator fitur turunan, dan riwayat. Angka hasilnya simulasi dari rumus sederhana di JavaScript, belum memanggil API. Field respons `/predict` (`label`, `probability`, `threshold`, `model_version`) sudah sejajar dengan elemen di halaman ini. Kalau nanti dihubungkan, set `CORS_ORIGINS` di `.env`.
+
+Dua halaman contoh lain (sama-sama tanpa koneksi):
+
+- `ui/project_explorer.html`: penjelajah file project dengan isi file tertanam. Jalankan `python scripts/build_explorer.py` setiap file project berubah. File `.csv` dan `.sql` hanya tampil metadatanya.
+- `ui/pipeline_monitor.html`: gambaran status run GitHub Actions, model registry (versi, alias champion, threshold), dan perbandingan baseline vs SMOTE. Angka riwayat dan versi adalah ilustrasi.
 
 ## Catatan penting
 

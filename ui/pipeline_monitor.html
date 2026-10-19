@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor pipeline dan model (dummy)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1ee;--panel:#fff;--ink:#16262b;--muted:#5b6b70;--line:#cbd4d1;--track:#dde4e1;--ok:#1f7a5a;--fail:#c2410c;--b:#6b7f86;
+  --sans:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#111a1d;--panel:#182327;--ink:#e6eeeb;--muted:#9aaba9;--line:#2b3a3e;--track:#263337;--ok:#4dbf96;--fail:#f08a5d;--b:#8fa3aa;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--sans)}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 20px 44px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:10px;border-bottom:2px solid var(--ink);padding-bottom:12px}
+h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.01em}
+h2{margin:0 0 12px;font-size:16px;font-weight:600}
+.mono{font:400 12px/1.5 var(--mono);color:var(--muted)} .mono b{color:var(--ink);font-weight:600}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px;margin-top:20px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:820px){.cols{grid-template-columns:1fr}}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:820px){.steps{grid-template-columns:repeat(2,1fr)}}
+.steps li{border:1px solid var(--line);border-top:4px solid var(--ok);border-radius:4px;padding:8px 10px;font-size:13px}
+.steps li.fail{border-top-color:var(--fail)} .steps li.skip{border-top-color:var(--track);color:var(--muted)}
+.steps small{display:block;font:400 12px var(--mono);color:var(--muted)}
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-weight:600;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--line);font:400 13px var(--mono);white-space:nowrap}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--fail);font-weight:600}
+.tag{display:inline-block;padding:1px 8px;border:1px solid var(--ok);color:var(--ok);border-radius:10px;font:600 11px var(--sans)}
+.cmp{display:grid;grid-template-columns:110px 1fr 44px;gap:6px 10px;align-items:center;font-size:13px}
+.cmp .t{position:relative;height:9px;background:var(--track);border-radius:2px}
+.cmp .t i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--b)}
+.cmp .t.s i{background:var(--ok)}
+.cmp span.v{font:400 12px var(--mono);text-align:right}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-bottom:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:14px}
+dt{color:var(--muted)} dd{margin:0;font-family:var(--mono);font-size:13px}
+.note{margin-top:16px;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Monitor pipeline dan model</h1>
+    <div class="mono">run terakhir <b>sukses</b>, commit <b>a3f9c1e</b>, 19 Okt 2026 10:42</div>
+  </header>
+
+  <section class="panel">
+    <h2>Run terakhir (GitHub Actions)</h2>
+    <ol class="steps">
+      <li>Siapkan SSH<small>2 dtk</small></li>
+      <li>Update kode<small>4 dtk</small></li>
+      <li>Install dependency<small>38 dtk</small></li>
+      <li>Sync DAG<small>1 dtk</small></li>
+      <li>Trigger DAG<small>1 mnt 12 dtk</small></li>
+      <li>Jalankan notebook<small>3 mnt 41 dtk</small></li>
+      <li>Reload FastAPI<small>6 dtk</small></li>
+      <li>Cek kesehatan API<small>4 dtk</small></li>
+    </ol>
+  </section>
+
+  <div class="cols">
+    <section class="panel">
+      <h2>Model registry: machine_failure_xgb</h2>
+      <div class="table-scroll"><table>
+        <thead><tr><th>Versi</th><th>Varian</th><th>val F1</th><th>test PR-AUC</th><th>Threshold</th><th>Alias</th></tr></thead>
+        <tbody>
+          <tr><td>7</td><td>baseline</td><td>0,816</td><td>0,726</td><td>0,578</td><td><span class="tag">champion</span></td></tr>
+          <tr><td>6</td><td>smote</td><td>0,796</td><td>0,877</td><td>0,857</td><td></td></tr>
+          <tr><td>5</td><td>baseline</td><td>0,801</td><td>0,712</td><td>0,590</td><td></td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">Champion dipilih dari F1 validation, bukan test set.</p>
+    </section>
+
+    <section class="panel">
+      <h2>API yang sedang melayani</h2>
+      <dl>
+        <dt>Status</dt><dd class="ok">sehat, model termuat</dd>
+        <dt>Model</dt><dd>machine_failure_xgb@champion</dd>
+        <dt>Versi</dt><dd>7 (baseline)</dd>
+        <dt>Threshold</dt><dd>0,578</dd>
+        <dt>Dimuat</dt><dd>19 Okt 2026 10:42</dd>
+        <dt>MLflow run</dt><dd>9c41...e07</dd>
+      </dl>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Baseline dan SMOTE di test set</h2>
+    <div class="legend"><span><i style="background:var(--b)"></i>Baseline</span><span><i style="background:var(--ok)"></i>SMOTE</span></div>
+    <div class="cmp">
+      <span>Precision</span><div><div class="t"><i style="width:80%"></i></div><div class="t s" style="margin-top:3px"><i style="width:91.1%"></i></div></div><span class="v">0,80<br>0,91</span>
+      <span>Recall</span><div><div class="t"><i style="width:70.6%"></i></div><div class="t s" style="margin-top:3px"><i style="width:75%"></i></div></div><span class="v">0,71<br>0,75</span>
+      <span>F1 failure</span><div><div class="t"><i style="width:75%"></i></div><div class="t s" style="margin-top:3px"><i style="width:82.3%"></i></div></div><span class="v">0,75<br>0,82</span>
+      <span>PR-AUC</span><div><div class="t"><i style="width:72.6%"></i></div><div class="t s" style="margin-top:3px"><i style="width:87.7%"></i></div></div><span class="v">0,73<br>0,88</span>
+    </div>
+    <p class="note">Angka dari eksekusi awal notebook (68 kasus failure di test set). Selisih sekecil itu masih bisa dalam batas noise.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Riwayat run</h2>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Waktu</th><th>Commit</th><th>Pemicu</th><th>Langkah akhir</th><th>Durasi</th><th>Hasil</th></tr></thead>
+      <tbody>
+        <tr><td>19 Okt 10:42</td><td>a3f9c1e</td><td>push main</td><td>Cek kesehatan API</td><td>5 mnt 48 dtk</td><td class="ok">Sukses</td></tr>
+        <tr><td>18 Okt 16:05</td><td>7be20d4</td><td>push main</td><td>Trigger DAG</td><td>2 mnt 31 dtk</td><td class="bad">Gagal: validasi jumlah baris</td></tr>
+        <tr><td>18 Okt 09:20</td><td>7be20d4</td><td>manual</td><td>Cek kesehatan API</td><td>5 mnt 52 dtk</td><td class="ok">Sukses</td></tr>
+        <tr><td>16 Okt 14:11</td><td>c01a9b8</td><td>push main</td><td>Cek kesehatan API</td><td>5 mnt 40 dtk</td><td class="ok">Sukses</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Tampilan contoh. Data di halaman ini hanya ilustrasi, belum terhubung ke GitHub, Airflow, atau MLflow.</p>
+  </section>
+</div>
+</body>
+</html>
