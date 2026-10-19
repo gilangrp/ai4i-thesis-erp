@@ -1,32 +1,39 @@
-#!/bin/bash
 
-# Exit immediately if a command exits with a non-zero status
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "=== Installing prerequisites ==="
-sudo apt-get install -y apt-transport-https ca-certificates dirmngr
-
-echo "=== Adding ClickHouse GPG Key ==="
-sudo mkdir -p /usr/local/share/keyrings
-curl -fsSL https://clickhouse.com | sudo gpg --dearmor -o /usr/local/share/keyrings/clickhouse-keyring.gpg
-
-echo "=== Adding ClickHouse Repository ==="
-echo "deb [signed-by=/usr/local/share/keyrings/clickhouse-keyring.gpg] https://clickhouse.com stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
-
-echo "=== Updating package list ==="
+echo "=== Update package ==="
 sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
 
-echo "=== Installing ClickHouse Server and Client ==="
-# Note: The installer may prompt you to set a password for the default user.
-# If you run this in a purely automated CI/CD environment, prefix with: DEBIAN_FRONTEND=noninteractive
+echo "=== Add ClickHouse repository key ==="
+sudo install -d -m 0755 /usr/share/keyrings
+
+curl -fsSL https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key \
+  | sudo gpg --dearmor --yes \
+      -o /usr/share/keyrings/clickhouse-keyring.gpg
+
+echo "=== Add ClickHouse repository ==="
+ARCH="$(dpkg --print-architecture)"
+
+echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=${ARCH}] https://packages.clickhouse.com/deb stable main" \
+  | sudo tee /etc/apt/sources.list.d/clickhouse.list >/dev/null
+
+echo "=== Install ClickHouse ==="
+sudo apt-get update
 sudo apt-get install -y clickhouse-server clickhouse-client
 
-echo "=== Starting ClickHouse Service ==="
-sudo systemctl start clickhouse-server
-sudo systemctl enable clickhouse-server
+echo "=== Enable and start service ==="
+sudo systemctl enable --now clickhouse-server
 
-echo "=== Verifying ClickHouse installation ==="
-sudo systemctl is-active clickhouse-server
-clickhouse-client --version
+echo "=== Check version ==="
+clickhouse-client --query "SELECT version()"
 
-echo "=== ClickHouse installation complete! ==="
+echo "=== Check service status ==="
+sudo systemctl --no-pager --full status clickhouse-server
+
+echo "=== Check RAM and disk ==="
+free -h
+df -h /
+
+echo "=== ClickHouse installation completed ==="
