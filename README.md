@@ -1,6 +1,6 @@
 # Machine Failure Prediction (MFP) — MLOps Pipeline
 
-Arsitektur end-to-end Machine Learning Operations (MLOps) untuk prediksi kegagalan mesin industri (*predictive maintenance*), mengintegrasikan **Oracle Database**, **Apache Airflow**, **ClickHouse**, **MLflow**, dan **FastAPI**.
+Arsitektur end-to-end Machine Learning Operations (MLOps) untuk prediksi kegagalan mesin industri (*predictive maintenance*), mengintegrasikan **Database SQL**, **Apache Airflow**, **ClickHouse**, **MLflow**, dan **FastAPI**.
 
 ---
 
@@ -9,11 +9,11 @@ Arsitektur end-to-end Machine Learning Operations (MLOps) untuk prediksi kegagal
 ```
 [ Sensor / Data CSV ]
         │
-        ▼ (csv_to_oracle_quartal_insert.py)
-[ Oracle: MACHINE_OPERATION_STAGING ]  <── Buffer data baru mingguan (batch)
+        ▼ (csv_to_dbsql_quartal_insert.py)
+[ Database SQL: MACHINE_OPERATION_STAGING ]  <── Buffer data baru mingguan (batch)
         │
         ▼ (Airflow DAG: etl_oracle_to_clickhouse_mfp | @hourly)
-        ├──> Pindahkan 250 data ──> [ Oracle: MACHINE_OPERATION ] (Histori OLTP)
+        ├──> Pindahkan 250 data ──> [ Database SQL: MACHINE_OPERATION ] (Histori OLTP)
         │
         ▼ (Append data baru)
 [ ClickHouse: machine_operation ]      <── OLAP Data Warehouse untuk ML
@@ -41,14 +41,14 @@ Arsitektur end-to-end Machine Learning Operations (MLOps) untuk prediksi kegagal
 ├── notebooks/
 │   └── SMOTE_ai4i2020_xgboost_machine_failure.ipynb  # Eksperimen, training (XGBoost + SMOTE), & MLflow log
 ├── scripts/
-│   ├── csv_to_oracle_insert.py              # Konversi CSV ke file SQL INSERT Oracle
-│   ├── csv_to_oracle_quartal_insert.py      # Split dataset ke training (8.000) & weekly (8 x 250)
+│   ├── csv_to_dbsql_insert.py              # Konversi CSV ke file SQL INSERT Database SQL
+│   ├── csv_to_dbsql_quartal_insert.py      # Split dataset ke training (8.000) & weekly (8 x 250)
 │   ├── sql_to_csv.py                        # Konversi balik file SQL INSERT ke file CSV
 │   └── trigger_airflow_dag.py               # Script pemicu & monitor DAG Airflow via REST API
 ├── serving/
 │   └── app.py                               # REST API FastAPI (memuat model langsung dari MLflow)
 ├── sql/
-│   ├── create_table.sql                     # DDL Oracle: MACHINE_OPERATION & MACHINE_OPERATION_STAGING
+│   ├── create_table.sql                     # DDL Database SQL: MACHINE_OPERATION & MACHINE_OPERATION_STAGING
 │   ├── create_table_clickhouse.sql          # DDL ClickHouse: database erp_ai4i & tabel machine_operation
 │   ├── insert_ai4i2020.sql                  # Batch INSERT 10.000 data ke staging
 │   └── quartal/                             # Pembagian data simulasi:
@@ -70,7 +70,7 @@ Arsitektur end-to-end Machine Learning Operations (MLOps) untuk prediksi kegagal
 ## 🚀 Panduan Menjalankan Sistem
 
 ### 1. Inisialisasi Database
-1. **Oracle:** Jalankan `sql/create_table.sql` untuk membuat tabel `MACHINE_OPERATION` dan `MACHINE_OPERATION_STAGING`.
+1. **Database SQL:** Jalankan `sql/create_table.sql` untuk membuat tabel `MACHINE_OPERATION` dan `MACHINE_OPERATION_STAGING`.
 2. **ClickHouse:** Jalankan `sql/create_table_clickhouse.sql` untuk membuat database `erp_ai4i` dan tabel `machine_operation`.
 3. **Simulasi Data Masuk:** Masukkan data awal dengan mengeksekusi `sql/quartal/training/training.sql` ke tabel `MACHINE_OPERATION_STAGING`.
 
@@ -80,7 +80,7 @@ Arsitektur end-to-end Machine Learning Operations (MLOps) untuk prediksi kegagal
 - **Mekanisme:**
   1. Mengambil **250 data** (konfigurasi variabel `BATCH_SIZE`) dari `MACHINE_OPERATION_STAGING`.
   2. Menyimpan (*append*) data tersebut ke ClickHouse `machine_operation`.
-  3. Memindahkan data yang berhasil dikirim ke tabel utama Oracle `MACHINE_OPERATION` dan menghapusnya dari staging.
+  3. Memindahkan data yang berhasil dikirim ke tabel utama Database SQL `MACHINE_OPERATION` dan menghapusnya dari staging.
   4. Memvalidasi bahwa data sudah berhasil masuk ke ClickHouse.
 
 **Konfigurasi Airflow Connections (Admin > Connections):**
