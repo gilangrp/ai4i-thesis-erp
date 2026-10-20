@@ -1,163 +1,144 @@
-# Machine Failure Prediction (MFP)
+# Machine Failure Prediction (MFP) — MLOps Pipeline
 
-Pipeline dari data mentah sampai model yang dilayani lewat API:
+Arsitektur end-to-end Machine Learning Operations (MLOps) untuk prediksi kegagalan mesin industri (*predictive maintenance*), mengintegrasikan **Oracle Database**, **Apache Airflow**, **ClickHouse**, **MLflow**, dan **FastAPI**.
 
-```
-CSV ──(1) csv_to_oracle_insert.py──> file .sql ──(manual)──> Oracle 26ai
-                                                                │
-                                          (2) DAG Airflow etl_oracle_to_clickhouse_mfp
-                                                                ▼
-                                                           ClickHouse
-                                                                │
-                                          (3) notebook (papermill) train + log
-                                                                ▼
-                                            MLflow Tracking + Model Registry
-                                                  alias: machine_failure_prediction_xgb@champion
-                                                                │
-                                          (4) FastAPI (uvicorn + pm2) memuat dari registry
-                                                                ▼
-                                                    POST /predict  ──> UI
-```
+---
 
-Trigger otomatis: push ke `main` -> GitHub Actions SSH ke server -> `workflows/deploy_remote.sh`.
-
-## Struktur folder
+## 🏗️ Arsitektur & Alur Data
 
 ```
-machine-failure-mlops/
-├── .github/workflows/mlops-pipeline.yml   # CI/CD: SSH > DAG > notebook > reload API
+[ Sensor / Data CSV ]
+        │
+        ▼ (csv_to_oracle_quartal_insert.py)
+[ Oracle: MACHINE_OPERATION_STAGING ]  <── Buffer data baru mingguan (batch)
+        │
+        ▼ (Airflow DAG: etl_oracle_to_clickhouse_mfp | @hourly)
+        ├──> Pindahkan 250 data ──> [ Oracle: MACHINE_OPERATION ] (Histori OLTP)
+        │
+        ▼ (Append data baru)
+[ ClickHouse: machine_operation ]      <── OLAP Data Warehouse untuk ML
+        │
+        ▼ (papermill notebook)
+[ MLflow Tracking & Model Registry ]   <── Model: machine_failure_prediction_xgb@champion
+        │
+        ▼ (Load model via API)
+[ FastAPI Serving (Uvicorn + PM2) ]    <── POST /predict & /predict/batch
+        │
+        ▼
+[ Dashboard & Client UI ]
+```
+
+---
+
+## 📁 Struktur Direktori
+
+```
 ├── dags/
-│   ├── etl_oracle_to_clickhouse_mfp.py    # DAG Airflow (Oracle 26ai -> ClickHouse)
-│   └── requirements-airflow.txt           # dependensi untuk env Airflow
-├── data/ai4i2020.csv                      # data sumber
+│   ├── etl_oracle_to_clickhouse_mfp.py      # DAG Airflow: Incremental batch (Staging -> ClickHouse & Main)
+│   └── requirements-airflow.txt             # Dependensi Python di environment Airflow
+├── data/
+│   └── ai4i2020.csv                         # Dataset sumber Machine Failure
 ├── notebooks/
-│   └── SMOTE_ai4i2020_xgboost_machine_failure.ipynb   # training + log ke MLflow
+│   └── SMOTE_ai4i2020_xgboost_machine_failure.ipynb  # Eksperimen, training (XGBoost + SMOTE), & MLflow log
 ├── scripts/
-│   ├── build_explorer.py                  # bangun ui/project_explorer.html
-│   ├── csv_to_oracle_insert.py            # CSV -> INSERT INTO Oracle
-│   ├── trigger_airflow_dag.py             # trigger + tunggu DAG via REST API
-│   └── deploy_remote.sh                   # dijalankan di server oleh workflow
-├── serving/app.py                         # FastAPI, model dari MLflow Registry
-├── sql/insert_ai4i2020.sql                # hasil generate (tabel MACHINE_OPERATION)
+│   ├── csv_to_oracle_insert.py              # Konversi CSV ke file SQL INSERT Oracle
+│   ├── csv_to_oracle_quartal_insert.py      # Split dataset ke training (8.000) & weekly (8 x 250)
+│   ├── sql_to_csv.py                        # Konversi balik file SQL INSERT ke file CSV
+│   └── trigger_airflow_dag.py               # Script pemicu & monitor DAG Airflow via REST API
+├── serving/
+│   └── app.py                               # REST API FastAPI (memuat model langsung dari MLflow)
+├── sql/
+│   ├── create_table.sql                     # DDL Oracle: MACHINE_OPERATION & MACHINE_OPERATION_STAGING
+│   ├── create_table_clickhouse.sql          # DDL ClickHouse: database erp_ai4i & tabel machine_operation
+│   ├── insert_ai4i2020.sql                  # Batch INSERT 10.000 data ke staging
+│   └── quartal/                             # Pembagian data simulasi:
+│       ├── training/training.sql            # 8.000 data awal (baseline)
+│       └── weekly/week1.sql - week8.sql     # 250 data per minggu (simulasi batch baru)
 ├── ui/
-│   ├── dummy_dashboard.html               # contoh form prediksi
-│   ├── pipeline_monitor.html              # contoh status pipeline + model registry
-│   └── project_explorer.html              # daftar file project + isinya
-├── runs/                                  # hasil eksekusi notebook (papermill)
-├── ecosystem.config.js                    # konfigurasi pm2
-├── requirements.txt
-└── .env.example
+│   ├── dummy_dashboard.html                 # Simulator input sensor & visualisasi probabilitas failure
+│   └── dataset_viewer.html                  # Viewer tabel dataset
+├── workflows/
+│   ├── deploy_remote.sh                     # Orchestrator update, ETL, retraining & reload di server
+│   └── mlops-pipeline.yml                   # Template CI/CD GitHub Actions (SSH deployment)
+├── ecosystem.config.js                      # Konfigurasi process manager PM2 untuk FastAPI
+├── requirements.txt                         # Dependensi utama server (Notebook, API, MLflow)
+└── .env.example                             # Template konfigurasi environment variable
 ```
 
-## 1. CSV ke script INSERT Oracle
+---
 
-```bash
-python scripts/csv_to_oracle_insert.py \
-  --csv data/ai4i2020.csv --out sql/insert_ai4i2020.sql \
-  --table MACHINE_OPERATION [--schema NAMA_SCHEMA] [--batch-size 500] [--style multirow|single]
-```
+## 🚀 Panduan Menjalankan Sistem
 
-- `multirow` (default): `INSERT INTO t (...) VALUES (...),(...);` per 500 baris, sintaks Oracle 23ai/26ai. Maksimal 1000 baris per statement.
-- `single`: satu INSERT per baris, untuk kompatibilitas.
-- Kolom (sesuai urutan CSV): `UDI, PRODUCT_ID, TYPE, AIR_TEMP_K, PROCESS_TEMP_K, RPM, TORQUE_NM, TOOL_WEAR_MIN, MACHINE_FAILURE, TWF, HDF, PWF, OSF, RNF`. Kalau skema Anda memakai nama lain, ubah daftar `COLUMNS` di bagian atas script.
-- `sql/insert_ai4i2020.sql` sudah dibuat dari CSV yang dilampirkan (10.000 baris, tanpa `CREATE TABLE`). Hanya berisi INSERT dan `COMMIT`.
+### 1. Inisialisasi Database
+1. **Oracle:** Jalankan `sql/create_table.sql` untuk membuat tabel `MACHINE_OPERATION` dan `MACHINE_OPERATION_STAGING`.
+2. **ClickHouse:** Jalankan `sql/create_table_clickhouse.sql` untuk membuat database `erp_ai4i` dan tabel `machine_operation`.
+3. **Simulasi Data Masuk:** Masukkan data awal dengan mengeksekusi `sql/quartal/training/training.sql` ke tabel `MACHINE_OPERATION_STAGING`.
 
-## 2. DAG Airflow (Oracle ke ClickHouse)
+### 2. Pipeline ETL Airflow (Incremental Ingestion)
+- **DAG:** `etl_oracle_to_clickhouse_mfp`
+- **Jadwal:** Berjalan otomatis setiap 1 jam sekali (`@hourly`).
+- **Mekanisme:**
+  1. Mengambil **250 data** (konfigurasi variabel `BATCH_SIZE`) dari `MACHINE_OPERATION_STAGING`.
+  2. Menyimpan (*append*) data tersebut ke ClickHouse `machine_operation`.
+  3. Memindahkan data yang berhasil dikirim ke tabel utama Oracle `MACHINE_OPERATION` dan menghapusnya dari staging.
+  4. Memvalidasi bahwa data sudah berhasil masuk ke ClickHouse.
 
-`etl_oracle_to_clickhouse_mfp`: `create_clickhouse_table` > `extract_and_load` > `validate`. Tanpa jadwal, hanya dipicu lewat API. Full refresh: tabel ClickHouse di-`TRUNCATE` lalu diisi ulang, lalu jumlah baris dan jumlah failure dibandingkan dengan Oracle.
+**Konfigurasi Airflow Connections (Admin > Connections):**
+- `oracle_mfp`: Generic | Host: `1521` | Schema/Service: `FREEPDB1`
+- `clickhouse_mfp`: Generic | Host: `8123` (HTTP) | Schema: `erp_ai4i`
 
-Yang perlu disiapkan di Airflow:
+### 3. Pelatihan Model & MLflow Tracking
+Notebook membaca data dari ClickHouse, melatih model XGBoost (Baseline vs SMOTE), memilih model terbaik berdasarkan F1-score validation, dan mendaftarkannya ke MLflow Registry dengan alias `@champion`.
 
-| Item | Nilai |
-|---|---|
-| Connection `oracle_mfp` | Host, Port 1521, Login, Password, Extra `{"service_name": "..."}` |
-| Connection `clickhouse_mfp` | Host, Port 8123 (HTTP), Login, Password, **Schema = nama database** |
-| Env `ORACLE_SOURCE_TABLE` | default `MACHINE_OPERATION`, boleh `SCHEMA.TABEL` |
-| Env `CH_TABLE` | default `machine_operation` |
-| Paket | `pip install -r dags/requirements-airflow.txt` |
-
-DAG ditulis kompatibel Airflow 2.x dan 3.x. Nama kolom di Oracle harus sama dengan daftar di atas (query memakai kolom eksplisit).
-
-## 3. Notebook ke MLflow
-
-Notebook membaca ClickHouse (`DATA_SOURCE=clickhouse`; `csv` untuk eksperimen lokal), melatih baseline dan SMOTE, lalu:
-
-- mencatat dua run (param, metrik val + test, confusion matrix, feature importance, model + signature),
-- memilih champion (`MODEL_TO_REGISTER=auto` = **F1 validation** tertinggi, bukan test set),
-- mendaftarkan ke registry dan memberi alias `champion`. Threshold, fitur, dan type_map disimpan sebagai **tag model version**.
-
-Semua konfigurasi lewat environment variable (lihat `.env.example`). Jalankan manual:
-
+Eksekusi manual:
 ```bash
 set -a; source .env; set +a
-papermill notebooks/SMOTE_ai4i2020_xgboost_machine_failure.ipynb runs/out.ipynb --cwd notebooks
+papermill notebooks/SMOTE_ai4i2020_xgboost_machine_failure.ipynb runs/executed.ipynb --cwd notebooks
 ```
 
-## 4. FastAPI
+### 4. Menjalankan Serving API (FastAPI)
+Model dimuat langsung dari MLflow Model Registry (`models:/machine_failure_prediction_xgb@champion`).
 
 ```bash
-cd serving && uvicorn app:app --reload --port 8000     # dev
-pm2 start ecosystem.config.js                          # produksi
+# Mode Development
+cd serving && uvicorn app:app --reload --port 8000
+
+# Mode Produksi (via PM2)
+pm2 start ecosystem.config.js
 ```
 
-| Endpoint | Fungsi |
-|---|---|
-| `GET /health` | status + `model_loaded` |
-| `GET /model-info` | nama, versi, threshold, fitur, run_id MLflow |
-| `POST /predict` | satu pembacaan sensor |
-| `POST /predict/batch` | `{"items": [...]}`, maks 1000 |
-| `POST /reload` | muat ulang dari MLflow tanpa restart, header `X-API-Key: $ADMIN_API_KEY` |
+**Daftar Endpoint API:**
+| Method | Endpoint | Keterangan |
+|---|---|---|
+| `GET` | `/health` | Cek status API & verifikasi apakah model sudah termuat |
+| `GET` | `/model-info` | Informasi detail model aktif (nama, versi, threshold, fitur) |
+| `POST` | `/predict` | Prediksi untuk 1 pembacaan data sensor |
+| `POST` | `/predict/batch` | Prediksi batch (hingga 1.000 data sekaligus) |
+| `POST` | `/reload` | Muat ulang model terbaru dari MLflow tanpa restart service |
 
+**Contoh Request Prediksi:**
 ```bash
-curl -s localhost:8000/predict -H 'Content-Type: application/json' -d '{
-  "type":"L","air_temp_k":300.5,"process_temp_k":310.9,
-  "rpm":1500,"torque_nm":55.0,"tool_wear_min":215}'
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "L",
+    "air_temp_k": 300.5,
+    "process_temp_k": 310.9,
+    "rpm": 1500,
+    "torque_nm": 55.0,
+    "tool_wear_min": 215
+  }'
 ```
 
-Docs interaktif: `http://localhost:8000/docs`. Model dimuat dari `models:/<MLFLOW_MODEL_NAME>@<MLFLOW_MODEL_ALIAS>`, tidak ada file model di server. Kalau MLflow tidak terjangkau saat start, API tetap hidup dengan `model_loaded:false` dan `/predict` mengembalikan 503.
+---
 
-## 5. CI/CD (GitHub Actions)
+## 🔄 Deployment Otomatis (CI/CD)
 
-File: `.github/workflows/mlops-pipeline.yml`. Jalan saat push ke `main` yang mengubah `dags/`, `notebooks/`, `serving/`, `scripts/`, `requirements.txt`, atau `ecosystem.config.js` (atau manual lewat *Run workflow*).
-
-Urutan di server (`workflows/deploy_remote.sh`): update git > install dependency > copy DAG ke `AIRFLOW_DAGS_DIR` > trigger DAG via API dan tunggu sukses > jalankan notebook dengan papermill > `pm2 startOrReload` > cek `/health` memastikan model termuat. Kalau salah satu langkah gagal, workflow merah dan langkah berikutnya tidak jalan (API lama tetap melayani model lama).
-
-**GitHub Secrets** (Settings > Secrets and variables > Actions):
-
-| Secret | Isi |
-|---|---|
-| `SSH_HOST`, `SSH_USER` | tujuan SSH |
-| `SSH_PORT` | opsional, default 22 |
-| `SSH_PRIVATE_KEY` | private key khusus deploy |
-| `SSH_KNOWN_HOSTS` | disarankan, output `ssh-keyscan -H host` (tanpa ini host key di-scan saat run) |
-| `APP_DIR` | path project di server, mis. `/opt/machine-failure-mlops` |
-
-Kredensial Airflow, ClickHouse, dan MLflow **tidak** disimpan di GitHub, tetapi di `.env` pada server.
-
-**Setup server sekali saja:**
-
-```bash
-git clone <repo> /opt/machine-failure-mlops && cd /opt/machine-failure-mlops
-cp .env.example .env && nano .env
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-pm2 startup   # agar API hidup lagi setelah reboot
-```
-
-Prasyarat: server punya akses `git fetch` ke repo (deploy key), `pm2`, `curl`, dan Airflow API aktif (`AIRFLOW_API_VERSION=v2` untuk Airflow 3, `v1` untuk Airflow 2).
-
-## 6. UI
-
-`ui/dummy_dashboard.html` bisa dibuka langsung di browser. Isinya form sensor, gauge probabilitas dengan penanda threshold, tiga indikator fitur turunan, dan riwayat. Angka hasilnya simulasi dari rumus sederhana di JavaScript, belum memanggil API. Field respons `/predict` (`label`, `probability`, `threshold`, `model_version`) sudah sejajar dengan elemen di halaman ini. Kalau nanti dihubungkan, set `CORS_ORIGINS` di `.env`.
-
-Dua halaman contoh lain (sama-sama tanpa koneksi):
-
-- `ui/project_explorer.html`: penjelajah file project dengan isi file tertanam. Jalankan `python scripts/build_explorer.py` setiap file project berubah. File `.csv` dan `.sql` hanya tampil metadatanya.
-- `ui/pipeline_monitor.html`: gambaran status run GitHub Actions, model registry (versi, alias champion, threshold), dan perbandingan baseline vs SMOTE. Angka riwayat dan versi adalah ilustrasi.
-
-## Catatan penting
-
-- **Rumus fitur ada di dua tempat** (`make_features` di notebook dan `serving/app.py`). Daftar dan urutan fitur otomatis ikut model lewat tag MLflow, tetapi rumusnya tidak. Ubah keduanya bersamaan.
-- **Baseline berhenti di iterasi 3** pada eksekusi awal (lihat output notebook asli), jadi perbandingan baseline vs SMOTE belum sepenuhnya adil. Kalau champion terpilih terasa janggal, cek dulu early stopping sebelum menyimpulkan.
-- `TRUNCATE` + reload berarti ClickHouse kosong sesaat selama DAG berjalan. Untuk 10.000 baris ini hitungan detik.
-- `/reload` hanya memuat ulang satu proses. Dengan `UVICORN_WORKERS` > 1, gunakan `pm2 reload` agar semua worker ikut.
-- Dataset bersifat sintetis dengan label dari aturan ambang, jadi skor tinggi belum tentu berlaku di data pabrik nyata.
+- File template CI/CD tersedia di: `workflows/mlops-pipeline.yml`.
+- Ketika dipindahkan ke `.github/workflows/`, setiap push ke branch `main` akan memicu deployment via SSH ke server:
+  1. Git checkout kode terbaru.
+  2. Install/update dependensi Python.
+  3. Sinkronisasi DAG ke folder Airflow.
+  4. Trigger DAG dan pastikan data terbaru tersinkronisasi.
+  5. Menjalankan retraining notebook via Papermill.
+  6. Reload FastAPI via PM2 (`pm2 reload`) dan validasi `/health`.
