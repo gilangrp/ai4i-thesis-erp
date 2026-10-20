@@ -1,9 +1,12 @@
 """
-DAG: Oracle 26ai -> ClickHouse (Machine Failure Prediction).
+DAG: Oracle 26ai -> ClickHouse (Machine Failure Prediction - Incremental Batch).
 
-Dipicu lewat API (schedule=None) oleh GitHub Actions / deploy script.
-Full refresh: tabel ClickHouse dikosongkan lalu diisi ulang dari Oracle,
-kemudian divalidasi (jumlah baris + jumlah failure harus sama).
+Jadwal: Berjalan otomatis setiap 1 jam sekali (schedule="@hourly").
+Alur Kerja:
+1. Membaca data sejumlah BATCH_SIZE (default: 250) dari MACHINE_OPERATION_STAGING di Oracle.
+2. Mengirim (append) data tersebut ke tabel ClickHouse (machine_operation).
+3. Memindahkan 250 data tersebut di Oracle: disalin ke MACHINE_OPERATION lalu dihapus dari MACHINE_OPERATION_STAGING.
+4. Validasi data berhasil termuat di ClickHouse.
 
 Airflow Connections yang dibutuhkan (Admin > Connections):
   oracle_mfp      Conn Type: Generic | Host | Port 1521 | Login | Password
@@ -11,10 +14,11 @@ Airflow Connections yang dibutuhkan (Admin > Connections):
   clickhouse_mfp  Conn Type: Generic | Host | Port 8123 (HTTP) | Login | Password
                    Schema: <nama database ClickHouse>   Extra: {"secure": false}
 
-Env (opsional, default di bawah):
-  ORACLE_SOURCE_TABLE   default MACHINE_OPERATION   (boleh "SCHEMA.TABEL")
+Env (opsional):
+  STAGING_BATCH_SIZE    default 250
+  ORACLE_STAGING_TABLE  default MACHINE_OPERATION_STAGING
+  ORACLE_MAIN_TABLE     default MACHINE_OPERATION
   CH_TABLE              default machine_operation
-Dependensi di environment Airflow: oracledb, clickhouse-connect
 """
 import json
 import os
@@ -28,9 +32,12 @@ except ImportError:  # Airflow 2.x
 
 ORACLE_CONN_ID = "oracle_mfp"
 CH_CONN_ID = "clickhouse_mfp"
-ORACLE_TABLE = os.getenv("ORACLE_SOURCE_TABLE", "MACHINE_OPERATION")
+
+# Konfigurasi batch & nama tabel
+BATCH_SIZE = int(os.getenv("STAGING_BATCH_SIZE", "250"))
+ORACLE_STAGING_TABLE = os.getenv("ORACLE_STAGING_TABLE", "MACHINE_OPERATION_STAGING")
+ORACLE_MAIN_TABLE = os.getenv("ORACLE_MAIN_TABLE", "MACHINE_OPERATION")
 CH_TABLE = os.getenv("CH_TABLE", "machine_operation")
-CHUNK = 5000
 
 # (nama kolom, tipe ClickHouse, fungsi cast Python)
 COLS = [
@@ -67,19 +74,20 @@ def _ch_client():
 
 @dag(
     dag_id="etl_oracle_to_clickhouse_mfp",
-    description="Full refresh dataset Machine Failure Prediction dari Oracle ke ClickHouse",
-    schedule=None,
+    description="Incremental ETL: Ambil batch dari Staging Oracle, append ke ClickHouse, pindah ke main Oracle",
+    schedule="@hourly",
     start_date=datetime(2026, 1, 1),
     catchup=False,
     max_active_runs=1,
     dagrun_timeout=timedelta(hours=1),
     default_args={"retries": 2, "retry_delay": timedelta(minutes=2)},
-    tags=["mfp", "oracle", "clickhouse", "mlops"],
+    tags=["mfp", "oracle", "clickhouse", "incremental", "staging"],
 )
 def etl_oracle_to_clickhouse_mfp():
 
     @task
     def create_clickhouse_table() -> None:
+        """Membuat tabel ClickHouse jika belum ada (MergeTree)."""
         ddl_cols = ",\n  ".join(f"{n} {t}" for n, t, _ in COLS)
         ch = _ch_client()
         ch.command(
@@ -88,40 +96,85 @@ def etl_oracle_to_clickhouse_mfp():
         )
 
     @task
-    def extract_and_load() -> int:
+    def process_staging_batch() -> dict:
+        """
+        1. Ambil data sebanyak BATCH_SIZE dari Oracle MACHINE_OPERATION_STAGING
+        2. Kirim ke ClickHouse (append)
+        3. Pindahkan data dari STAGING ke MAIN (MACHINE_OPERATION) di Oracle
+        """
         ch = _ch_client()
-        ch.command(f"TRUNCATE TABLE {CH_TABLE}")  # full refresh
-        total = 0
+
         with _oracle_conn() as conn:
             cur = conn.cursor()
-            cur.arraysize = CHUNK
-            cur.execute(f"SELECT {', '.join(COL_NAMES)} FROM {ORACLE_TABLE} ORDER BY udi")
-            while True:
-                rows = cur.fetchmany(CHUNK)
-                if not rows:
-                    break
-                data = [[fn(v) if v is not None else None for v, (_, _, fn) in zip(r, COLS)]
-                        for r in rows]
-                ch.insert(CH_TABLE, data, column_names=COL_NAMES)
-                total += len(data)
-        print(f"Loaded {total} rows into {CH_TABLE}")
-        return total
+
+            # 1. Ambil data batch dari staging (urut UDI)
+            cols_str = ", ".join(COL_NAMES)
+            fetch_query = f"""
+                SELECT {cols_str}
+                FROM {ORACLE_STAGING_TABLE}
+                ORDER BY udi
+                FETCH FIRST :batch_size ROWS ONLY
+            """
+            cur.execute(fetch_query, [BATCH_SIZE])
+            rows = cur.fetchall()
+
+            if not rows:
+                print(f"Tabel {ORACLE_STAGING_TABLE} kosong. Tidak ada data untuk diproses.")
+                return {"count": 0, "sample_udis": []}
+
+            batch_count = len(rows)
+            udis = [r[0] for r in rows]
+            print(f"Mengambil {batch_count} baris dari {ORACLE_STAGING_TABLE} (UDI: {udis[0]} .. {udis[-1]}).")
+
+            # 2. Kirim data ke ClickHouse (append)
+            data = [[fn(v) if v is not None else None for v, (_, _, fn) in zip(r, COLS)]
+                    for r in rows]
+            ch.insert(CH_TABLE, data, column_names=COL_NAMES)
+            print(f"Berhasil meng-insert {batch_count} baris ke ClickHouse ({CH_TABLE}).")
+
+            # 3. Pindahkan ke MACHINE_OPERATION di Oracle
+            placeholders = ", ".join([f":{i+1}" for i in range(len(COL_NAMES))])
+            insert_main_sql = f"""
+                INSERT INTO {ORACLE_MAIN_TABLE} ({cols_str})
+                VALUES ({placeholders})
+            """
+            cur.executemany(insert_main_sql, rows)
+
+            # 4. Hapus data yang sudah dipindahkan dari STAGING di Oracle
+            delete_staging_sql = f"DELETE FROM {ORACLE_STAGING_TABLE} WHERE udi = :1"
+            cur.executemany(delete_staging_sql, [[u] for u in udis])
+
+            conn.commit()
+            print(f"Berhasil memindahkan {batch_count} baris dari {ORACLE_STAGING_TABLE} ke {ORACLE_MAIN_TABLE}.")
+
+            return {
+                "count": batch_count,
+                "first_udi": udis[0],
+                "last_udi": udis[-1]
+            }
 
     @task
-    def validate(loaded: int) -> None:
-        with _oracle_conn() as conn:
-            cur = conn.cursor()
-            cur.execute(f"SELECT COUNT(*), NVL(SUM(machine_failure), 0) FROM {ORACLE_TABLE}")
-            ora_count, ora_fail = (int(x) for x in cur.fetchone())
-        ch_count, ch_fail = _ch_client().query(
-            f"SELECT count(), sum(machine_failure) FROM {CH_TABLE}").result_rows[0]
-        print(f"Oracle: {ora_count} baris / {ora_fail} failure | ClickHouse: {ch_count} / {ch_fail}")
-        if ora_count == 0:
-            raise ValueError("Tabel Oracle kosong, load dibatalkan.")
-        if (ora_count, ora_fail) != (int(ch_count), int(ch_fail)) or loaded != ora_count:
-            raise ValueError("Validasi gagal: data Oracle dan ClickHouse tidak sama.")
+    def validate(result: dict) -> None:
+        """Validasi data yang baru saja dipindahkan."""
+        count = result.get("count", 0)
+        if count == 0:
+            print("Tidak ada batch yang dimuat pada run kali ini.")
+            return
 
-    create_clickhouse_table() >> validate(extract_and_load())
+        first_udi = result["first_udi"]
+        last_udi = result["last_udi"]
+
+        # Verifikasi data ada di ClickHouse
+        ch = _ch_client()
+        ch_check = ch.query(
+            f"SELECT count() FROM {CH_TABLE} WHERE udi >= {first_udi} AND udi <= {last_udi}"
+        ).result_rows[0][0]
+
+        print(f"Validasi ClickHouse: {ch_check} baris ditemukan untuk rentang UDI {first_udi}..{last_udi}")
+        if int(ch_check) < count:
+            raise ValueError(f"Validasi gagal: diharapkan minimal {count} baris di ClickHouse, tapi ada {ch_check}")
+
+    create_clickhouse_table() >> validate(process_staging_batch())
 
 
 etl_oracle_to_clickhouse_mfp()
