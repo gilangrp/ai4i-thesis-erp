@@ -1,3 +1,4 @@
 # Pasang di environment Airflow (bukan .venv project)
 oracledb
 clickhouse-connect
+psycopg2-binary
