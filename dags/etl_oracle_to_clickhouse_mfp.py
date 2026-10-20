@@ -1,19 +1,19 @@
 """
-DAG: Oracle 26ai -> ClickHouse (dataset AI4I 2020).
+DAG: Oracle 26ai -> ClickHouse (Machine Failure Prediction).
 
 Dipicu lewat API (schedule=None) oleh GitHub Actions / deploy script.
 Full refresh: tabel ClickHouse dikosongkan lalu diisi ulang dari Oracle,
 kemudian divalidasi (jumlah baris + jumlah failure harus sama).
 
 Airflow Connections yang dibutuhkan (Admin > Connections):
-  oracle_ai4i      Conn Type: Generic | Host | Port 1521 | Login | Password
+  oracle_mfp      Conn Type: Generic | Host | Port 1521 | Login | Password
                    Extra: {"service_name": "FREEPDB1"}
-  clickhouse_ai4i  Conn Type: Generic | Host | Port 8123 (HTTP) | Login | Password
+  clickhouse_mfp  Conn Type: Generic | Host | Port 8123 (HTTP) | Login | Password
                    Schema: <nama database ClickHouse>   Extra: {"secure": false}
 
 Env (opsional, default di bawah):
-  ORACLE_SOURCE_TABLE   default AI4I_2020   (boleh "SCHEMA.TABEL")
-  CH_TABLE              default ai4i_2020
+  ORACLE_SOURCE_TABLE   default MACHINE_OPERATION   (boleh "SCHEMA.TABEL")
+  CH_TABLE              default machine_operation
 Dependensi di environment Airflow: oracledb, clickhouse-connect
 """
 import json
@@ -26,10 +26,10 @@ except ImportError:  # Airflow 2.x
     from airflow.decorators import dag, task
     from airflow.hooks.base import BaseHook
 
-ORACLE_CONN_ID = "oracle_ai4i"
-CH_CONN_ID = "clickhouse_ai4i"
-ORACLE_TABLE = os.getenv("ORACLE_SOURCE_TABLE", "AI4I_2020")
-CH_TABLE = os.getenv("CH_TABLE", "ai4i_2020")
+ORACLE_CONN_ID = "oracle_mfp"
+CH_CONN_ID = "clickhouse_mfp"
+ORACLE_TABLE = os.getenv("ORACLE_SOURCE_TABLE", "MACHINE_OPERATION")
+CH_TABLE = os.getenv("CH_TABLE", "machine_operation")
 CHUNK = 5000
 
 # (nama kolom, tipe ClickHouse, fungsi cast Python)
@@ -66,17 +66,17 @@ def _ch_client():
 
 
 @dag(
-    dag_id="oracle_to_clickhouse_ai4i",
-    description="Full refresh dataset AI4I 2020 dari Oracle ke ClickHouse",
+    dag_id="etl_oracle_to_clickhouse_mfp",
+    description="Full refresh dataset Machine Failure Prediction dari Oracle ke ClickHouse",
     schedule=None,
     start_date=datetime(2026, 1, 1),
     catchup=False,
     max_active_runs=1,
     dagrun_timeout=timedelta(hours=1),
     default_args={"retries": 2, "retry_delay": timedelta(minutes=2)},
-    tags=["ai4i", "oracle", "clickhouse", "mlops"],
+    tags=["mfp", "oracle", "clickhouse", "mlops"],
 )
-def oracle_to_clickhouse_ai4i():
+def etl_oracle_to_clickhouse_mfp():
 
     @task
     def create_clickhouse_table() -> None:
@@ -124,4 +124,4 @@ def oracle_to_clickhouse_ai4i():
     create_clickhouse_table() >> validate(extract_and_load())
 
 
-oracle_to_clickhouse_ai4i()
+etl_oracle_to_clickhouse_mfp()

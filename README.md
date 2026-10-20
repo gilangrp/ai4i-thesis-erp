@@ -1,18 +1,18 @@
-# Machine Failure MLOps (AI4I 2020)
+# Machine Failure Prediction (MFP)
 
 Pipeline dari data mentah sampai model yang dilayani lewat API:
 
 ```
 CSV ──(1) csv_to_oracle_insert.py──> file .sql ──(manual)──> Oracle 26ai
                                                                 │
-                                          (2) DAG Airflow oracle_to_clickhouse_ai4i
+                                          (2) DAG Airflow etl_oracle_to_clickhouse_mfp
                                                                 ▼
                                                            ClickHouse
                                                                 │
                                           (3) notebook (papermill) train + log
                                                                 ▼
                                             MLflow Tracking + Model Registry
-                                                  alias: machine_failure_xgb@champion
+                                                  alias: machine_failure_prediction_xgb@champion
                                                                 │
                                           (4) FastAPI (uvicorn + pm2) memuat dari registry
                                                                 ▼
@@ -27,7 +27,7 @@ Trigger otomatis: push ke `main` -> GitHub Actions SSH ke server -> `scripts/dep
 machine-failure-mlops/
 ├── .github/workflows/mlops-pipeline.yml   # CI/CD: SSH > DAG > notebook > reload API
 ├── dags/
-│   ├── oracle_to_clickhouse_ai4i.py       # DAG Airflow (Oracle 26ai -> ClickHouse)
+│   ├── etl_oracle_to_clickhouse_mfp.py    # DAG Airflow (Oracle 26ai -> ClickHouse)
 │   └── requirements-airflow.txt           # dependensi untuk env Airflow
 ├── data/ai4i2020.csv                      # data sumber
 ├── notebooks/
@@ -38,7 +38,7 @@ machine-failure-mlops/
 │   ├── trigger_airflow_dag.py             # trigger + tunggu DAG via REST API
 │   └── deploy_remote.sh                   # dijalankan di server oleh workflow
 ├── serving/app.py                         # FastAPI, model dari MLflow Registry
-├── sql/insert_ai4i2020.sql                # hasil generate (tabel AI4I_2020)
+├── sql/insert_ai4i2020.sql                # hasil generate (tabel MACHINE_OPERATION)
 ├── ui/
 │   ├── dummy_dashboard.html               # contoh form prediksi
 │   ├── pipeline_monitor.html              # contoh status pipeline + model registry
@@ -54,7 +54,7 @@ machine-failure-mlops/
 ```bash
 python scripts/csv_to_oracle_insert.py \
   --csv data/ai4i2020.csv --out sql/insert_ai4i2020.sql \
-  --table AI4I_2020 [--schema NAMA_SCHEMA] [--batch-size 500] [--style multirow|single]
+  --table MACHINE_OPERATION [--schema NAMA_SCHEMA] [--batch-size 500] [--style multirow|single]
 ```
 
 - `multirow` (default): `INSERT INTO t (...) VALUES (...),(...);` per 500 baris, sintaks Oracle 23ai/26ai. Maksimal 1000 baris per statement.
@@ -64,16 +64,16 @@ python scripts/csv_to_oracle_insert.py \
 
 ## 2. DAG Airflow (Oracle ke ClickHouse)
 
-`oracle_to_clickhouse_ai4i`: `create_clickhouse_table` > `extract_and_load` > `validate`. Tanpa jadwal, hanya dipicu lewat API. Full refresh: tabel ClickHouse di-`TRUNCATE` lalu diisi ulang, lalu jumlah baris dan jumlah failure dibandingkan dengan Oracle.
+`etl_oracle_to_clickhouse_mfp`: `create_clickhouse_table` > `extract_and_load` > `validate`. Tanpa jadwal, hanya dipicu lewat API. Full refresh: tabel ClickHouse di-`TRUNCATE` lalu diisi ulang, lalu jumlah baris dan jumlah failure dibandingkan dengan Oracle.
 
 Yang perlu disiapkan di Airflow:
 
 | Item | Nilai |
 |---|---|
-| Connection `oracle_ai4i` | Host, Port 1521, Login, Password, Extra `{"service_name": "..."}` |
-| Connection `clickhouse_ai4i` | Host, Port 8123 (HTTP), Login, Password, **Schema = nama database** |
-| Env `ORACLE_SOURCE_TABLE` | default `AI4I_2020`, boleh `SCHEMA.TABEL` |
-| Env `CH_TABLE` | default `ai4i_2020` |
+| Connection `oracle_mfp` | Host, Port 1521, Login, Password, Extra `{"service_name": "..."}` |
+| Connection `clickhouse_mfp` | Host, Port 8123 (HTTP), Login, Password, **Schema = nama database** |
+| Env `ORACLE_SOURCE_TABLE` | default `MACHINE_OPERATION`, boleh `SCHEMA.TABEL` |
+| Env `CH_TABLE` | default `machine_operation` |
 | Paket | `pip install -r dags/requirements-airflow.txt` |
 
 DAG ditulis kompatibel Airflow 2.x dan 3.x. Nama kolom di Oracle harus sama dengan daftar di atas (query memakai kolom eksplisit).
@@ -160,4 +160,4 @@ Dua halaman contoh lain (sama-sama tanpa koneksi):
 - **Baseline berhenti di iterasi 3** pada eksekusi awal (lihat output notebook asli), jadi perbandingan baseline vs SMOTE belum sepenuhnya adil. Kalau champion terpilih terasa janggal, cek dulu early stopping sebelum menyimpulkan.
 - `TRUNCATE` + reload berarti ClickHouse kosong sesaat selama DAG berjalan. Untuk 10.000 baris ini hitungan detik.
 - `/reload` hanya memuat ulang satu proses. Dengan `UVICORN_WORKERS` > 1, gunakan `pm2 reload` agar semua worker ikut.
-- Dataset AI4I bersifat sintetis dengan label dari aturan ambang, jadi skor tinggi belum tentu berlaku di data pabrik nyata.
+- Dataset bersifat sintetis dengan label dari aturan ambang, jadi skor tinggi belum tentu berlaku di data pabrik nyata.

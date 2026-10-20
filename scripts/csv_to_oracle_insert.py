@@ -11,7 +11,7 @@ dikerjakan manual. Nama kolom tujuan (urutan = urutan kolom CSV):
 Contoh:
     python scripts/csv_to_oracle_insert.py \
         --csv data/ai4i2020.csv --out sql/insert_ai4i2020.sql \
-        --table AI4I_2020 --schema MYSCHEMA
+        --table MACHINE_OPERATION --schema MYSCHEMA
 
 Style output:
     multirow (default) : INSERT INTO t (cols) VALUES (...),(...);  -> Oracle 23ai/26ai,
@@ -50,7 +50,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--csv", default="data/ai4i2020.csv")
     ap.add_argument("--out", default="sql/insert_ai4i2020.sql")
-    ap.add_argument("--table", default="AI4I_2020")
+    ap.add_argument("--table", default="MACHINE_OPERATION")
     ap.add_argument("--schema", default=None, help="prefix schema, opsional")
     ap.add_argument("--batch-size", type=int, default=500, help="baris per INSERT (maks 1000)")
     ap.add_argument("--style", choices=["multirow", "single"], default="multirow")
