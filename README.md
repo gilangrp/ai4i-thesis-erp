@@ -19,7 +19,7 @@ CSV ──(1) csv_to_oracle_insert.py──> file .sql ──(manual)──> Ora
                                                     POST /predict  ──> UI
 ```
 
-Trigger otomatis: push ke `main` -> GitHub Actions SSH ke server -> `scripts/deploy_remote.sh`.
+Trigger otomatis: push ke `main` -> GitHub Actions SSH ke server -> `workflows/deploy_remote.sh`.
 
 ## Struktur folder
 
@@ -120,7 +120,7 @@ Docs interaktif: `http://localhost:8000/docs`. Model dimuat dari `models:/<MLFLO
 
 File: `.github/workflows/mlops-pipeline.yml`. Jalan saat push ke `main` yang mengubah `dags/`, `notebooks/`, `serving/`, `scripts/`, `requirements.txt`, atau `ecosystem.config.js` (atau manual lewat *Run workflow*).
 
-Urutan di server (`scripts/deploy_remote.sh`): update git > install dependency > copy DAG ke `AIRFLOW_DAGS_DIR` > trigger DAG via API dan tunggu sukses > jalankan notebook dengan papermill > `pm2 startOrReload` > cek `/health` memastikan model termuat. Kalau salah satu langkah gagal, workflow merah dan langkah berikutnya tidak jalan (API lama tetap melayani model lama).
+Urutan di server (`workflows/deploy_remote.sh`): update git > install dependency > copy DAG ke `AIRFLOW_DAGS_DIR` > trigger DAG via API dan tunggu sukses > jalankan notebook dengan papermill > `pm2 startOrReload` > cek `/health` memastikan model termuat. Kalau salah satu langkah gagal, workflow merah dan langkah berikutnya tidak jalan (API lama tetap melayani model lama).
 
 **GitHub Secrets** (Settings > Secrets and variables > Actions):
 
