@@ -15,7 +15,7 @@ Total data: 8.000 + (8 x 250) = 10.000 data (seluruh baris dataset tanpa duplika
 
 Contoh:
     python scripts/csv_to_oracle_quartal_insert.py
-    python scripts/csv_to_oracle_quartal_insert.py --seed 42 --table MACHINE_OPERATION
+    python scripts/csv_to_oracle_quartal_insert.py --seed 42 --table MACHINE_OPERATION_STAGING
 """
 import argparse
 import csv
@@ -88,7 +88,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--csv", default="data/ai4i2020.csv", help="path ke file ai4i2020.csv")
     ap.add_argument("--out-dir", default="sql/quartal", help="direktori utama output SQL")
-    ap.add_argument("--table", default="MACHINE_OPERATION", help="nama tabel Oracle")
+    ap.add_argument("--table", default="MACHINE_OPERATION_STAGING", help="nama tabel Oracle")
     ap.add_argument("--schema", default=None, help="prefix schema Oracle (opsional)")
     ap.add_argument("--train-size", type=int, default=8000, help="jumlah baris data training (default: 8000)")
     ap.add_argument("--week-size", type=int, default=250, help="jumlah baris per weekly file (default: 250)")
