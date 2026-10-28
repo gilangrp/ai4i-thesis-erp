@@ -1,0 +1,12 @@
+airflow local mac: {"admin": "4GFKuSS7qQcdRESy"}
+
+
+========================
+VPS:
+PostgreSQL: user (airflow_etl), password (airflow_etl)
+ClickHouse: user (airflow_etl), password (airflow_etl)
+
+Airflow
+sudo cat /root/airflow/simple_auth_manager_passwords.json.generated
+aiflow vps: {"admin": "2btADuAn6geMGZX7"}
+
