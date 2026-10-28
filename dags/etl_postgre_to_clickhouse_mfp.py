@@ -9,11 +9,17 @@ Alur Kerja:
 4. Validasi data berhasil termuat di ClickHouse.
 
 Airflow Connections yang dibutuhkan (Admin > Connections):
-  postgres_mfp    Conn Type: Postgres | Host | Port 5432 | Login | Password | Schema (Database)
+  postgres_mfp    Conn Type: Postgres | Host | Port 5432 | Login (airflow_etl) | Password | Schema / Database: erp_ai4i
   clickhouse_mfp  Conn Type: Generic  | Host | Port 8123 (HTTP) | Login | Password
-                   Schema: <nama database ClickHouse>   Extra: {"secure": false}
+                   Schema: erp_ai4i   Extra: {"secure": false}
+
+Catatan PostgreSQL:
+  - Database: erp_ai4i
+  - Schema: public (tabel: public.machine_operation & public.machine_operation_staging)
 
 Env (opsional):
+  PG_DATABASE           default erp_ai4i
+  CH_DATABASE           default erp_ai4i
   STAGING_BATCH_SIZE    default 250
   PG_STAGING_TABLE      default machine_operation_staging
   PG_MAIN_TABLE         default machine_operation
@@ -23,16 +29,14 @@ import json
 import os
 from datetime import datetime, timedelta
 
-try:  # Airflow 3.x
-    from airflow.sdk import BaseHook, dag, task
-except ImportError:  # Airflow 2.x
-    from airflow.decorators import dag, task
-    from airflow.hooks.base import BaseHook
+from airflow.sdk import BaseHook, dag, task
 
 PG_CONN_ID = "postgres_mfp"
 CH_CONN_ID = "clickhouse_mfp"
 
-# Konfigurasi batch & nama tabel
+# Konfigurasi database, batch & nama tabel
+PG_DATABASE = os.getenv("PG_DATABASE", "erp_ai4i")
+CH_DATABASE = os.getenv("CH_DATABASE", "erp_ai4i")
 BATCH_SIZE = int(os.getenv("STAGING_BATCH_SIZE", "250"))
 PG_STAGING_TABLE = os.getenv("PG_STAGING_TABLE", "machine_operation_staging")
 PG_MAIN_TABLE = os.getenv("PG_MAIN_TABLE", "machine_operation")
@@ -54,12 +58,15 @@ COL_NAMES = [c[0] for c in COLS]
 def _pg_conn():
     import psycopg2  # driver PostgreSQL
     c = BaseHook.get_connection(PG_CONN_ID)
+    # Catatan: Di PostgreSQL, 'public' adalah schema, sedangkan database adalah 'erp_ai4i'.
+    # Jika c.schema kosong atau bernilai 'public' / 'postgres', gunakan database 'erp_ai4i'.
+    dbname = c.schema if c.schema and c.schema not in ("public", "postgres") else PG_DATABASE
     return psycopg2.connect(
         host=c.host,
         port=c.port or 5432,
-        user=c.login or "postgres",
+        user=c.login or "airflow_etl",
         password=c.password or "",
-        dbname=c.schema or "postgres",
+        dbname=dbname,
     )
 
 
@@ -69,7 +76,7 @@ def _ch_client():
     extra = json.loads(c.extra) if c.extra else {}
     return clickhouse_connect.get_client(
         host=c.host, port=int(c.port or 8123), username=c.login or "default",
-        password=c.password or "", database=c.schema or "default",
+        password=c.password or "", database=c.schema or CH_DATABASE,
         secure=bool(extra.get("secure", False)),
     )
 
