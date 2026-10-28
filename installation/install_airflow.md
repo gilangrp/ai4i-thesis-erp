@@ -67,7 +67,7 @@ source airflow_venv/bin/activate
 5. **Install Apache Airflow**: Apache Airflow is available on PyPI. To install it, you can use the following command in your terminal:
 
 ```bash
-pip install apache-airflow==3.1.8 --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.1.8/constraints-3.11.txt"
+pip install "apache-airflow[postgres]==3.1.8" clickhouse-connect --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.1.8/constraints-3.11.txt"
 ```
 
 Note that installing with constraints - at least initially - is recommended for reproducible installation. It might sometimes happen that 3rd-party distributions are released and their latest versions break airflow. Using constraints makes the installation reproducible with versions of dependencies that were "frozen" at the time of releasing airflow. Note you have to specify both - Airflow version and Python version you are using.
