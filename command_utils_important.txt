@@ -1,4 +1,11 @@
 # ==============================================================================
+# COMMAND TEMP
+# ==============================================================================
+ALTER USER postgres WITH PASSWORD 'admin';
+mlflow ui --host 127.0.0.1 --port 5000
+
+
+# ==============================================================================
 # COMMAND UTILS IMPORTANT (CLICKHOUSE & POSTGRESQL)
 # Kumpulan perintah penting manajemen service & database di server/VPS
 # ==============================================================================
