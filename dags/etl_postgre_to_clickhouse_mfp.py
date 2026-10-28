@@ -16,17 +16,8 @@ Airflow Connections yang dibutuhkan (Admin > Connections):
 Catatan PostgreSQL:
   - Database: erp_ai4i
   - Schema: public (tabel: public.machine_operation & public.machine_operation_staging)
-
-Env (opsional):
-  PG_DATABASE           default erp_ai4i
-  CH_DATABASE           default erp_ai4i
-  STAGING_BATCH_SIZE    default 250
-  PG_STAGING_TABLE      default machine_operation_staging
-  PG_MAIN_TABLE         default machine_operation
-  CH_TABLE              default machine_operation
 """
 import json
-import os
 from datetime import datetime, timedelta
 
 from airflow.sdk import BaseHook, dag, task
@@ -35,12 +26,12 @@ PG_CONN_ID = "postgres_mfp"
 CH_CONN_ID = "clickhouse_mfp"
 
 # Konfigurasi database, batch & nama tabel
-PG_DATABASE = os.getenv("PG_DATABASE", "erp_ai4i")
-CH_DATABASE = os.getenv("CH_DATABASE", "erp_ai4i")
-BATCH_SIZE = int(os.getenv("STAGING_BATCH_SIZE", "250"))
-PG_STAGING_TABLE = os.getenv("PG_STAGING_TABLE", "machine_operation_staging")
-PG_MAIN_TABLE = os.getenv("PG_MAIN_TABLE", "machine_operation")
-CH_TABLE = os.getenv("CH_TABLE", "machine_operation")
+PG_DATABASE = "erp_ai4i"
+CH_DATABASE = "erp_ai4i"
+BATCH_SIZE = 250
+PG_STAGING_TABLE = "MACHINE_OPERATION_STAGING"
+PG_MAIN_TABLE = "MACHINE_OPERATION"
+CH_TABLE = "machine_operation"
 
 # (nama kolom, tipe ClickHouse, fungsi cast Python)
 COLS = [
