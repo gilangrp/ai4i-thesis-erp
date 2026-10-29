@@ -35,16 +35,6 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO airflow_etl;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO airflow_etl;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO airflow_etl;
 
-
--- Ensure the user owns or has full rights to the database
-GRANT ALL PRIVILEGES ON DATABASE erp_ai4i TO airflow_etl;
-
--- Connect to the specific airflow database
-\c erp_ai4i
-
--- Grant rights to the public schema (where Airflow creates its metadata tables)
-GRANT ALL PRIVILEGES ON SCHEMA public TO airflow_etl;
-
 -- 8. Validasi Hak Akses User airflow_etl
 SELECT current_database(), current_user;
 SELECT
