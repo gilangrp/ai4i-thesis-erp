@@ -1,0 +1,20 @@
+AIRFLOW Conn ID:
+PG_CONN_ID = "postgres_mfp"
+CH_CONN_ID = "clickhouse_mfp"
+
+Connection ID: postgres_mfp
+Connection Type: Postgres
+Host: 127.0.0.1
+Database / Schema: erp_ai4i
+Login: airflow_etl
+Password: airflow_etl
+Port: 5432
+
+Connection ID: clickhouse_mfp
+Connection Type: Generic
+Host: 127.0.0.1
+Database / Schema: erp_ai4i
+Login: airflow_etl
+Password: airflow_etl
+Port: 8123 (Penting: port HTTP 8123)
+Extra: {"secure": false}
