@@ -124,12 +124,12 @@ def _ch_client(timeout: int = 10):
 @dag(
     dag_id="etl_postgre_to_clickhouse_mfp",
     description="Incremental ETL: Fetch batch from PostgreSQL Staging, append to ClickHouse, move to main PostgreSQL table",
-    schedule="@hourly",
-    start_date=datetime(2026, 1, 1),
-    catchup=False,
-    max_active_runs=1,
-    dagrun_timeout=timedelta(hours=1),
-    default_args={"retries": 2, "retry_delay": timedelta(minutes=2)},
+    schedule="@hourly",  # Run automatically every 1 hour
+    start_date=datetime(2026, 1, 1),  # DAG is active starting from this date
+    catchup=False,  # Do not backfill missed runs since start_date
+    max_active_runs=1,  # Only 1 DAG run allowed at a time to prevent race conditions
+    dagrun_timeout=timedelta(hours=1),  # Kill the run if it exceeds 1 hour
+    default_args={"retries": 2, "retry_delay": timedelta(minutes=2)},  # Retry failed tasks up to 2 times with 2-minute delay
     tags=["mfp", "postgres", "clickhouse", "incremental", "staging"],
 )
 def etl_postgre_to_clickhouse_mfp():
