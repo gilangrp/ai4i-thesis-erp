@@ -2,7 +2,19 @@
 # COMMAND TEMP
 # ==============================================================================
 ALTER USER postgres WITH PASSWORD 'admin';
+
+# MLFlow ui
 mlflow ui --host 127.0.0.1 --port 5000
+
+# MLFlow server
+mlflow server --host 127.0.0.1 --port 5000
+
+# Include with mlflow ui
+mlflow server \
+  --host 127.0.0.1 \
+  --port 5000 \
+  --backend-store-uri sqlite:///mlflow.db \
+  --default-artifact-root ./mlruns
 
 
 # ==============================================================================
