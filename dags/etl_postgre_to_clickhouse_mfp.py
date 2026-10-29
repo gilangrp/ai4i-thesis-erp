@@ -1,19 +1,19 @@
 """
 DAG: PostgreSQL -> ClickHouse (Machine Failure Prediction - Incremental Batch).
 
-Jadwal: Berjalan otomatis setiap 1 jam sekali (schedule="@hourly").
-Alur Kerja:
-1. Membaca data sejumlah BATCH_SIZE (default: 250) dari public.machine_operation_staging di PostgreSQL.
-2. Mengirim (append) data tersebut ke tabel ClickHouse (erp_ai4i.machine_operation).
-3. Memindahkan 250 data tersebut di PostgreSQL: disalin ke public.machine_operation lalu dihapus dari public.machine_operation_staging.
-4. Validasi data berhasil termuat di ClickHouse.
+Schedule: Runs automatically every 1 hour (schedule="@hourly").
+Workflow:
+1. Read BATCH_SIZE rows (default: 250) from public.machine_operation_staging in PostgreSQL.
+2. Append those rows to the ClickHouse table (erp_ai4i.machine_operation).
+3. Move the 250 rows in PostgreSQL: copy to public.machine_operation then delete from public.machine_operation_staging.
+4. Validate that the data was successfully loaded into ClickHouse.
 
-Airflow Connections yang dibutuhkan (Admin > Connections):
+Required Airflow Connections (Admin > Connections):
   postgres_mfp    Conn Type: Postgres | Host | Port 5432 | Login (airflow_etl) | Password
   clickhouse_mfp  Conn Type: Generic  | Host | Port 8123 (HTTP) | Login | Password
                    Extra: {"secure": false}
 
-Catatan PostgreSQL (Hardcoded):
+PostgreSQL Notes (Hardcoded):
   - Database: erp_ai4i
   - Schema: public
   - Tables: public.machine_operation_staging & public.machine_operation
@@ -29,7 +29,7 @@ logger = logging.getLogger("airflow.task")
 PG_CONN_ID = "postgres_mfp"
 CH_CONN_ID = "clickhouse_mfp"
 
-# Konfigurasi database, schema, batch & nama tabel (Hardcoded)
+# Database, schema, batch & table name configuration (Hardcoded)
 PG_DATABASE = "erp_ai4i"
 PG_SCHEMA = "public"
 CH_DATABASE = "erp_ai4i"
@@ -38,7 +38,7 @@ PG_STAGING_TABLE = f"{PG_SCHEMA}.machine_operation_staging"
 PG_MAIN_TABLE = f"{PG_SCHEMA}.machine_operation"
 CH_TABLE = "machine_operation"
 
-# (nama kolom, tipe ClickHouse, fungsi cast Python)
+# (column name, ClickHouse type, Python cast function)
 COLS = [
     ("udi", "UInt32", int), ("product_id", "String", str),
     ("type", "LowCardinality(String)", str),
@@ -53,7 +53,7 @@ COL_NAMES = [c[0] for c in COLS]
 
 def _pg_conn(timeout: int = 10):
     import concurrent.futures
-    import psycopg2  # driver PostgreSQL
+    import psycopg2  # PostgreSQL driver
 
     c = BaseHook.get_connection(PG_CONN_ID)
     host = c.host or "127.0.0.1"
@@ -64,7 +64,7 @@ def _pg_conn(timeout: int = 10):
     sslmode = "disable" if host in ("127.0.0.1", "localhost", "::1") else "prefer"
 
     logger.info(
-        ">>> [PG_CONN] Mencoba koneksi ke PostgreSQL di %s:%s (db: %s, user: %s, timeout: %ds, sslmode: %s)...",
+        ">>> [PG_CONN] Attempting to connect to PostgreSQL at %s:%s (db: %s, user: %s, timeout: %ds, sslmode: %s)...",
         host, port, dbname, user, timeout, sslmode
     )
 
@@ -84,18 +84,18 @@ def _pg_conn(timeout: int = 10):
         future = executor.submit(_do_connect)
         try:
             conn = future.result(timeout=timeout)
-            logger.info(">>> [PG_CONN] Berhasil terhubung ke PostgreSQL (%s:%s/%s).", host, port, dbname)
+            logger.info(">>> [PG_CONN] Successfully connected to PostgreSQL (%s:%s/%s).", host, port, dbname)
             return conn
         except concurrent.futures.TimeoutError:
             err_msg = (
-                f"Koneksi ke PostgreSQL TIMEOUT setelah {timeout} detik! "
+                f"PostgreSQL connection TIMED OUT after {timeout} seconds! "
                 f"Host: '{host}', Port: {port}, Database: '{dbname}', User: '{user}'. "
-                "Kemungkinan PostgreSQL tidak merespons, port terblokir, atau service mati/hang."
+                "PostgreSQL may not be responding, port is blocked, or the service is down/hung."
             )
             logger.error(">>> [PG_CONN TIMEOUT] %s", err_msg)
             raise TimeoutError(err_msg)
         except Exception as e:
-            logger.error(">>> [PG_CONN ERROR] Gagal terhubung ke PostgreSQL (%s:%s): %s", host, port, str(e))
+            logger.error(">>> [PG_CONN ERROR] Failed to connect to PostgreSQL (%s:%s): %s", host, port, str(e))
             raise
 
 
@@ -106,7 +106,7 @@ def _ch_client(timeout: int = 10):
     host = c.host or "127.0.0.1"
     port = int(c.port or 8123)
     user = c.login or "default"
-    logger.info(">>> [CH_CONN] Menghubungkan ke ClickHouse di %s:%s (db: %s, user: %s)...", host, port, CH_DATABASE, user)
+    logger.info(">>> [CH_CONN] Connecting to ClickHouse at %s:%s (db: %s, user: %s)...", host, port, CH_DATABASE, user)
     client = clickhouse_connect.get_client(
         host=host,
         port=port,
@@ -117,13 +117,13 @@ def _ch_client(timeout: int = 10):
         connect_timeout=timeout,
         send_receive_timeout=30,
     )
-    logger.info(">>> [CH_CONN] Berhasil terhubung ke ClickHouse.")
+    logger.info(">>> [CH_CONN] Successfully connected to ClickHouse.")
     return client
 
 
 @dag(
     dag_id="etl_postgre_to_clickhouse_mfp",
-    description="Incremental ETL: Ambil batch dari Staging PostgreSQL, append ke ClickHouse, pindah ke main PostgreSQL",
+    description="Incremental ETL: Fetch batch from PostgreSQL Staging, append to ClickHouse, move to main PostgreSQL table",
     schedule="@hourly",
     start_date=datetime(2026, 1, 1),
     catchup=False,
@@ -136,43 +136,43 @@ def etl_postgre_to_clickhouse_mfp():
 
     @task(execution_timeout=timedelta(minutes=2))
     def create_clickhouse_table() -> None:
-        """Membuat tabel ClickHouse jika belum ada (MergeTree)."""
-        logger.info(">>> [create_clickhouse_table] Memeriksa/membuat tabel ClickHouse '%s'...", CH_TABLE)
+        """Create the ClickHouse table if it does not exist (MergeTree)."""
+        logger.info(">>> [create_clickhouse_table] Checking/creating ClickHouse table '%s'...", CH_TABLE)
         ddl_cols = ",\n  ".join(f"{n} {t}" for n, t, _ in COLS)
         ch = _ch_client()
         ch.command(
             f"CREATE TABLE IF NOT EXISTS {CH_TABLE} (\n  {ddl_cols}\n) "
             f"ENGINE = MergeTree ORDER BY udi"
         )
-        logger.info(">>> [create_clickhouse_table] Tabel ClickHouse '%s' siap digunakan.", CH_TABLE)
+        logger.info(">>> [create_clickhouse_table] ClickHouse table '%s' is ready.", CH_TABLE)
 
     @task(execution_timeout=timedelta(minutes=5))
     def process_staging_batch() -> dict:
         """
-        1. Ambil data sebanyak BATCH_SIZE dari PostgreSQL machine_operation_staging
-        2. Kirim ke ClickHouse (append)
-        3. Pindahkan data dari STAGING ke MAIN (machine_operation) di PostgreSQL
+        1. Fetch BATCH_SIZE rows from PostgreSQL machine_operation_staging
+        2. Send to ClickHouse (append)
+        3. Move data from STAGING to MAIN (machine_operation) in PostgreSQL
         """
-        step = "Inisialisasi koneksi ClickHouse"
+        step = "Initializing ClickHouse connection"
         logger.info(">>> ======================================================")
-        logger.info(">>> [MULAI] process_staging_batch: Memulai proses batch ETL")
+        logger.info(">>> [START] process_staging_batch: Starting ETL batch process")
         logger.info(">>> ======================================================")
 
         try:
-            step = "Menghubungkan ke ClickHouse"
+            step = "Connecting to ClickHouse"
             logger.info(">>> [STEP 1/5] %s...", step)
             ch = _ch_client()
-            logger.info(">>> [STEP 1/5] Koneksi ke ClickHouse berhasil.")
+            logger.info(">>> [STEP 1/5] ClickHouse connection successful.")
 
-            step = "Menghubungkan ke PostgreSQL"
+            step = "Connecting to PostgreSQL"
             logger.info(">>> [STEP 2/5] %s...", step)
             conn = _pg_conn()
-            logger.info(">>> [STEP 2/5] Koneksi ke PostgreSQL berhasil.")
+            logger.info(">>> [STEP 2/5] PostgreSQL connection successful.")
 
             try:
                 with conn.cursor() as cur:
-                    # 1. Ambil data batch dari staging (urut UDI)
-                    step = f"Membaca data dari {PG_STAGING_TABLE} (LIMIT {BATCH_SIZE})"
+                    # 1. Fetch batch data from staging (ordered by UDI)
+                    step = f"Reading data from {PG_STAGING_TABLE} (LIMIT {BATCH_SIZE})"
                     logger.info(">>> [STEP 2/5] %s...", step)
                     cols_str = ", ".join(COL_NAMES)
                     fetch_query = f"""
@@ -185,26 +185,26 @@ def etl_postgre_to_clickhouse_mfp():
                     rows = cur.fetchall()
 
                     if not rows:
-                        logger.info(">>> [INFO] Tabel %s kosong. Tidak ada data untuk diproses.", PG_STAGING_TABLE)
+                        logger.info(">>> [INFO] Table %s is empty. No data to process.", PG_STAGING_TABLE)
                         return {"count": 0, "sample_udis": []}
 
                     batch_count = len(rows)
                     udis = [r[0] for r in rows]
                     logger.info(
-                        ">>> [STEP 2/5] Berhasil mengambil %d baris dari %s (Rentang UDI: %d .. %d).",
+                        ">>> [STEP 2/5] Successfully fetched %d rows from %s (UDI range: %d .. %d).",
                         batch_count, PG_STAGING_TABLE, udis[0], udis[-1]
                     )
 
-                    # 2. Kirim data ke ClickHouse (append)
-                    step = f"Insert {batch_count} baris ke ClickHouse ({CH_TABLE})"
+                    # 2. Send data to ClickHouse (append)
+                    step = f"Insert {batch_count} rows into ClickHouse ({CH_TABLE})"
                     logger.info(">>> [STEP 3/5] %s...", step)
                     data = [[fn(v) if v is not None else None for v, (_, _, fn) in zip(r, COLS)]
                             for r in rows]
                     ch.insert(CH_TABLE, data, column_names=COL_NAMES)
-                    logger.info(">>> [STEP 3/5] Berhasil meng-insert %d baris ke ClickHouse (%s).", batch_count, CH_TABLE)
+                    logger.info(">>> [STEP 3/5] Successfully inserted %d rows into ClickHouse (%s).", batch_count, CH_TABLE)
 
-                    # 3. Pindahkan ke machine_operation di PostgreSQL
-                    step = f"Insert {batch_count} baris ke PostgreSQL ({PG_MAIN_TABLE})"
+                    # 3. Move to machine_operation in PostgreSQL
+                    step = f"Insert {batch_count} rows into PostgreSQL ({PG_MAIN_TABLE})"
                     logger.info(">>> [STEP 4/5] %s...", step)
                     placeholders = ", ".join(["%s"] * len(COL_NAMES))
                     insert_main_sql = f"""
@@ -212,19 +212,19 @@ def etl_postgre_to_clickhouse_mfp():
                         VALUES ({placeholders})
                     """
                     cur.executemany(insert_main_sql, rows)
-                    logger.info(">>> [STEP 4/5] Berhasil menyalin %d baris ke %s.", batch_count, PG_MAIN_TABLE)
+                    logger.info(">>> [STEP 4/5] Successfully copied %d rows to %s.", batch_count, PG_MAIN_TABLE)
 
-                    # 4. Hapus data yang sudah dipindahkan dari STAGING di PostgreSQL
-                    step = f"Menghapus {batch_count} baris dari PostgreSQL ({PG_STAGING_TABLE})"
+                    # 4. Delete the moved rows from STAGING in PostgreSQL
+                    step = f"Deleting {batch_count} rows from PostgreSQL ({PG_STAGING_TABLE})"
                     logger.info(">>> [STEP 5/5] %s...", step)
                     delete_staging_sql = f"DELETE FROM {PG_STAGING_TABLE} WHERE udi = %s"
                     cur.executemany(delete_staging_sql, [[u] for u in udis])
-                    logger.info(">>> [STEP 5/5] Berhasil menghapus %d baris dari %s.", batch_count, PG_STAGING_TABLE)
+                    logger.info(">>> [STEP 5/5] Successfully deleted %d rows from %s.", batch_count, PG_STAGING_TABLE)
 
-                    step = "Commit transaksi PostgreSQL"
-                    logger.info(">>> [STEP 5/5] Melakukan commit transaksi PostgreSQL...")
+                    step = "Committing PostgreSQL transaction"
+                    logger.info(">>> [STEP 5/5] Committing PostgreSQL transaction...")
                     conn.commit()
-                    logger.info(">>> [SUKSES] Transaksi PostgreSQL berhasil di-commit sepenuhnya.")
+                    logger.info(">>> [SUCCESS] PostgreSQL transaction committed successfully.")
 
                     return {
                         "count": batch_count,
@@ -233,48 +233,48 @@ def etl_postgre_to_clickhouse_mfp():
                     }
 
             except Exception as e_db:
-                logger.error(">>> [ERROR DATABASE] Terjadi error pada tahap: '%s'. Detail: %s", step, str(e_db))
+                logger.error(">>> [DATABASE ERROR] Error occurred at step: '%s'. Details: %s", step, str(e_db))
                 try:
                     conn.rollback()
-                    logger.warning(">>> [ROLLBACK] Rollback transaksi PostgreSQL berhasil dijalankan untuk melepas lock.")
+                    logger.warning(">>> [ROLLBACK] PostgreSQL transaction rolled back successfully to release locks.")
                 except Exception as e_rb:
-                    logger.error(">>> [ERROR ROLLBACK] Gagal melakukan rollback: %s", str(e_rb))
+                    logger.error(">>> [ROLLBACK ERROR] Failed to rollback: %s", str(e_rb))
                 raise e_db
 
             finally:
                 try:
                     conn.close()
-                    logger.info(">>> [KONEKSI] Koneksi PostgreSQL berhasil ditutup.")
+                    logger.info(">>> [CONNECTION] PostgreSQL connection closed successfully.")
                 except Exception:
                     pass
 
         except Exception as e:
-            logger.exception(">>> [FATAL ERROR] Gagal pada tahap: '%s'. Exception: %s", step, str(e))
+            logger.exception(">>> [FATAL ERROR] Failed at step: '%s'. Exception: %s", step, str(e))
             raise
 
     @task(execution_timeout=timedelta(minutes=2))
     def validate(result: dict) -> None:
-        """Validasi data yang baru saja dipindahkan."""
+        """Validate the data that was just loaded."""
         count = result.get("count", 0)
         if count == 0:
-            logger.info(">>> [validate] Tidak ada batch yang dimuat pada run kali ini.")
+            logger.info(">>> [validate] No batch was loaded in this run.")
             return
 
         first_udi = result["first_udi"]
         last_udi = result["last_udi"]
 
-        logger.info(">>> [validate] Memvalidasi data ClickHouse untuk rentang UDI %d..%d (diharapkan >= %d baris)...", first_udi, last_udi, count)
+        logger.info(">>> [validate] Validating ClickHouse data for UDI range %d..%d (expecting >= %d rows)...", first_udi, last_udi, count)
         ch = _ch_client()
         ch_check = ch.query(
             f"SELECT count() FROM {CH_TABLE} WHERE udi >= {first_udi} AND udi <= {last_udi}"
         ).result_rows[0][0]
 
-        logger.info(">>> [validate] Hasil pengecekan ClickHouse: %s baris ditemukan.", ch_check)
+        logger.info(">>> [validate] ClickHouse check result: %s rows found.", ch_check)
         if int(ch_check) < count:
-            err_msg = f"Validasi gagal: diharapkan minimal {count} baris di ClickHouse, tapi ada {ch_check}"
+            err_msg = f"Validation failed: expected at least {count} rows in ClickHouse, but found {ch_check}"
             logger.error(">>> [validate ERROR] %s", err_msg)
             raise ValueError(err_msg)
-        logger.info(">>> [validate SUKSES] Validasi berhasil, semua data termuat.")
+        logger.info(">>> [validate SUCCESS] Validation passed, all data loaded successfully.")
 
     create_clickhouse_table() >> validate(process_staging_batch())
 
