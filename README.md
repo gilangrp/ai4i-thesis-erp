@@ -19,7 +19,7 @@ Arsitektur end-to-end Machine Learning Operations (MLOps) untuk prediksi kegagal
 [ ClickHouse: machine_operation ]      <── OLAP Data Warehouse untuk ML
         │
         ▼ (papermill notebook)
-[ MLflow Tracking & Model Registry ]   <── Model: machine_failure_prediction_xgb@champion
+[ MLflow Tracking & Model Registry ]   <── Model: machine_failure_xgb@champion
         │
         ▼ (Load model via API)
 [ FastAPI Serving (Uvicorn + PM2) ]    <── POST /predict & /predict/batch
@@ -97,7 +97,7 @@ papermill notebooks/SMOTE_ai4i2020_xgboost_machine_failure.ipynb runs/executed.i
 ```
 
 ### 4. Menjalankan Serving API (FastAPI)
-Model dimuat langsung dari MLflow Model Registry (`models:/machine_failure_prediction_xgb@champion`).
+Model dimuat langsung dari MLflow Model Registry (`models:/machine_failure_xgb@champion`).
 
 ```bash
 # Mode Development

@@ -2,7 +2,7 @@
 FastAPI serving untuk prediksi machine failure.
 
 Model TIDAK dibaca dari file lokal: dimuat dari MLflow Model Registry lewat alias
-(default `models:/machine_failure_prediction_xgb@champion`). Threshold, daftar fitur, dan
+(default `models:/machine_failure_xgb@champion`). Threshold, daftar fitur, dan
 type_map ikut dari tag model version, jadi selalu sama dengan saat training.
 
 Jalankan (dev):   uvicorn app:app --reload --port 8000     (dari folder serving/)
@@ -11,7 +11,6 @@ Produksi:         pm2 start ecosystem.config.js
 import json
 import logging
 import os
-import secrets
 import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -22,7 +21,7 @@ import mlflow
 import mlflow.xgboost
 import pandas as pd
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from mlflow.tracking import MlflowClient
 from pydantic import BaseModel, Field
@@ -31,10 +30,9 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 log = logging.getLogger("uvicorn.error")
 TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
-MODEL_NAME = os.getenv("MLFLOW_MODEL_NAME", "machine_failure_prediction_xgb")
+MODEL_NAME = os.getenv("MLFLOW_MODEL_NAME", "machine_failure_xgb")
 MODEL_ALIAS = os.getenv("MLFLOW_MODEL_ALIAS", "champion")
-ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
-CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 
 
 # ----------------------------------------------------------------- feature engineering
@@ -103,9 +101,13 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Machine Failure API", version="1.0.0", lifespan=lifespan)
-if CORS_ORIGINS:
-    app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS,
-                       allow_methods=["GET", "POST"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS or ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ----------------------------------------------------------------- schema
@@ -180,10 +182,8 @@ def predict_batch(req: BatchRequest):
 
 
 @app.post("/reload")
-def reload_model(x_api_key: str = Header(default="")):
-    """Muat ulang model dari MLflow tanpa restart. Perlu header X-API-Key = ADMIN_API_KEY."""
-    if not ADMIN_API_KEY or not secrets.compare_digest(x_api_key, ADMIN_API_KEY):
-        raise HTTPException(403, "Forbidden")
+def reload_model():
+    """Muat ulang model dari MLflow tanpa restart."""
     try:
         st = store.load()
     except Exception as e:
