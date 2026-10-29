@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Machine Failure Prediction - Dashboard API Client</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .title-group h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .title-group p {
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    .base-url-input {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--card-bg);
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .base-url-input input {
+      background: transparent;
+      border: none;
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 0.875rem;
+      outline: none;
+      width: 200px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+      gap: 20px;
+    }
+
+    @media (max-width: 600px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .badge-get {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .badge-post {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .btn {
+      background: var(--primary);
+      color: #000;
+      font-weight: 600;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.875rem;
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .btn-danger:hover {
+      opacity: 0.9;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-group label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .form-group input,
+    .form-group select,
+    textarea {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      outline: none;
+      width: 100%;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    textarea:focus {
+      border-color: var(--primary);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 140px;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+
+    .response-box {
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #38bdf8;
+    }
+
+    .result-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .result-normal {
+      background: rgba(34, 197, 94, 0.2);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+
+    .result-failure {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    /* Hero Banner */
+    .hero-banner {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+      height: 280px;
+      background: #0b1120;
+    }
+
+    .hero-banner img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 30%;
+      filter: brightness(0.9) contrast(1.05);
+      display: block;
+    }
+
+    .hero-overlay {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 16px;
+      max-width: 480px;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--primary);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .hero-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    .hero-desc {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <header>
+      <div class="title-group">
+        <h1>⚙️ Machine Failure Prediction API Client</h1>
+        <p>Testing & Monitoring Dashboard untuk FastAPI Serving</p>
+      </div>
+      <div class="base-url-input">
+        <label for="baseUrl" style="font-size:0.75rem; color:var(--muted)">Base URL:</label>
+        <input type="text" id="baseUrl" value="http://localhost:8000">
+      </div>
+    </header>
+
+    <!-- Hero Banner with Industry Image -->
+    <div class="hero-banner">
+      <img src="./banner-image.jpeg" alt="Industrial Machine Monitoring">
+      <div class="hero-overlay">
+        <span class="hero-tag">⚡ AI Predictive Maintenance</span>
+        <div class="hero-title">Industrial Machine Operation & Failure Monitoring</div>
+        <div class="hero-desc">Sistem deteksi dini anomali dan prediksi kerusakan mesin manufaktur berbasis XGBoost &
+          MLflow Registry secara real-time.</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- 1. System Health & Reload -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span>System Status & Model Ops</span>
+          </div>
+        </div>
+        <p style="font-size:0.85rem; color:var(--muted)">Periksa status API, detail model champion yang dimuat, atau
+          reload model dari MLflow.</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="callApi('/health', 'GET', 'healthRes')">GET /health</button>
+          <button class="btn btn-secondary" onclick="callApi('/model-info', 'GET', 'healthRes')">GET
+            /model-info</button>
+          <button class="btn btn-danger" onclick="callApi('/reload', 'POST', 'healthRes')">POST /reload</button>
+        </div>
+        <div class="response-box" id="healthRes">...</div>
+      </div>
+
+      <!-- 2. Single Prediction -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="badge badge-post">POST</span>
+            <span>Single Prediction (/predict)</span>
+          </div>
+          <div id="singleStatusBadge"></div>
+        </div>
+
+        <form id="singleForm" onsubmit="event.preventDefault(); submitSinglePredict();">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Product Type</label>
+              <select id="p_type">
+                <option value="L">L (Low)</option>
+                <option value="M">M (Medium)</option>
+                <option value="H">H (High)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tool Wear [min]</label>
+              <input type="number" id="p_tool_wear" value="215" min="0" max="1000" required>
+            </div>
+            <div class="form-group">
+              <label>Air Temp [K]</label>
+              <input type="number" step="0.1" id="p_air_temp" value="300.5" required>
+            </div>
+            <div class="form-group">
+              <label>Process Temp [K]</label>
+              <input type="number" step="0.1" id="p_process_temp" value="310.9" required>
+            </div>
+            <div class="form-group">
+              <label>Rotational Speed [RPM]</label>
+              <input type="number" id="p_rpm" value="1500" required>
+            </div>
+            <div class="form-group">
+              <label>Torque [Nm]</label>
+              <input type="number" step="0.1" id="p_torque" value="55.0" required>
+            </div>
+          </div>
+          <div style="margin-top: 14px; display:flex; gap:8px;">
+            <button type="submit" class="btn">Predict Single</button>
+            <button type="button" class="btn btn-secondary" onclick="fillOverstrainSample()">Load Overstrain
+              Sample</button>
+          </div>
+        </form>
+
+        <div class="response-box" id="singleRes">...</div>
+      </div>
+
+      <!-- 3. Batch Prediction -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="badge badge-post">POST</span>
+            <span>Batch Prediction (/predict/batch)</span>
+          </div>
+        </div>
+        <p style="font-size:0.85rem; color:var(--muted)">Kirim beberapa data sekaligus (JSON payload format
+          <code>{ "items": [...] }</code>).
+        </p>
+
+        <textarea id="batchPayload">{
+  "items": [
+    {
+      "type": "L",
+      "air_temp_k": 298.1,
+      "process_temp_k": 308.6,
+      "rpm": 1551,
+      "torque_nm": 42.8,
+      "tool_wear_min": 0
+    },
+    {
+      "type": "L",
+      "air_temp_k": 300.5,
+      "process_temp_k": 310.9,
+      "rpm": 1500,
+      "torque_nm": 55.0,
+      "tool_wear_min": 215
+    }
+  ]
+}</textarea>
+
+        <div style="display:flex; gap:8px;">
+          <button class="btn" onclick="submitBatchPredict()">Predict Batch</button>
+        </div>
+
+        <div class="response-box" id="batchRes" style="max-height: 250px;">...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function getBaseUrl() {
+      return document.getElementById("baseUrl").value.replace(/\/+$/, '');
+    }
+
+    async function callApi(endpoint, method, targetElemId, body = null) {
+      const target = document.getElementById(targetElemId);
+      target.textContent = `Mengirim permintaan ke ${method} ${endpoint}...`;
+      try {
+        const opts = {
+          method: method,
+          headers: {}
+        };
+        if (body) {
+          opts.headers["Content-Type"] = "application/json";
+          opts.body = JSON.stringify(body);
+        }
+
+        const res = await fetch(`${getBaseUrl()}${endpoint}`, opts);
+        const data = await res.json();
+        target.textContent = JSON.stringify(data, null, 2);
+        return data;
+      } catch (err) {
+        target.textContent = `Error: ${err.message}\nPastikan FastAPI aktif dan CORS diizinkan jika beda host.`;
+      }
+    }
+
+    async function submitSinglePredict() {
+      const payload = {
+        type: document.getElementById("p_type").value,
+        air_temp_k: parseFloat(document.getElementById("p_air_temp").value),
+        process_temp_k: parseFloat(document.getElementById("p_process_temp").value),
+        rpm: parseInt(document.getElementById("p_rpm").value),
+        torque_nm: parseFloat(document.getElementById("p_torque").value),
+        tool_wear_min: parseInt(document.getElementById("p_tool_wear").value),
+      };
+
+      const res = await callApi("/predict", "POST", "singleRes", payload);
+      const badge = document.getElementById("singleStatusBadge");
+      if (res && res.label) {
+        if (res.label === "FAILURE") {
+          badge.innerHTML = `<span class="result-pill result-failure">⚠️ FAILURE (Prob: ${(res.probability * 100).toFixed(1)}%)</span>`;
+        } else {
+          badge.innerHTML = `<span class="result-pill result-normal">✅ NORMAL (Prob: ${(res.probability * 100).toFixed(1)}%)</span>`;
+        }
+      }
+    }
+
+    function fillOverstrainSample() {
+      document.getElementById("p_type").value = "L";
+      document.getElementById("p_air_temp").value = 300.5;
+      document.getElementById("p_process_temp").value = 310.9;
+      document.getElementById("p_rpm").value = 1500;
+      document.getElementById("p_torque").value = 55.0;
+      document.getElementById("p_tool_wear").value = 215;
+    }
+
+    async function submitBatchPredict() {
+      const raw = document.getElementById("batchPayload").value;
+      let jsonPayload;
+      try {
+        jsonPayload = JSON.parse(raw);
+      } catch (err) {
+        document.getElementById("batchRes").textContent = "JSON tidak valid: " + err.message;
+        return;
+      }
+      await callApi("/predict/batch", "POST", "batchRes", jsonPayload);
+    }
+  </script>
+</body>
+
+</html>
