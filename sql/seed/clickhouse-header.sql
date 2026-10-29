@@ -1,0 +1,1 @@
+INSERT INTO erp_ai4i.machine_operation (udi, product_id, type, air_temp_k, process_temp_k, rpm, torque_nm, tool_wear_min, machine_failure, twf, hdf, pwf, osf, rnf) VALUES
