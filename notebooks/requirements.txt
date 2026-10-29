@@ -1,0 +1,16 @@
+# ── Core data science ──────────────────────────────────────────────────────────
+numpy
+pandas
+matplotlib
+
+# ── Machine learning ───────────────────────────────────────────────────────────
+scikit-learn
+xgboost
+imbalanced-learn          # SMOTE (imblearn.over_sampling)
+
+# ── MLflow (experiment tracking + model registry) ──────────────────────────────
+mlflow
+
+# ── ClickHouse (data source) ───────────────────────────────────────────────────
+clickhouse-connect
+
