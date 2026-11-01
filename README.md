@@ -1,5 +1,7 @@
 # Machine Failure Prediction (MFP) — MLOps Pipeline
 
+PYTHON VERSION: 3.11.9
+
 Arsitektur end-to-end Machine Learning Operations (MLOps) untuk prediksi kegagalan mesin industri (*predictive maintenance*), mengintegrasikan **Database SQL**, **Apache Airflow**, **ClickHouse**, **MLflow**, dan **FastAPI**.
 
 ---
