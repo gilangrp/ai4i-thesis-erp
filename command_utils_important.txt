@@ -22,6 +22,19 @@ mlflow server \
 # Kumpulan perintah penting manajemen service & database di server/VPS
 # ==============================================================================
 
+# ==============================================================================
+# AIRFLOW
+# ==============================================================================
+
+# Run airflow
+source airflow_venv/bin/activate
+airflow standalone
+
+# STOP AIRFLOW process on ubuntu
+pkill -9 -f 'airflow worker'
+pkill -9 -f 'airflow scheduler'
+pkill -9 -f 'airflow triggerer'
+ps aux | grep '[a]irflow'
 
 # ==============================================================================
 # 1. CLICKHOUSE
