@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# SCRIPT TESTING CI/CD DI RUNNER GITHUB ACTIONS
-# Alur:
-# 1. Setup environment Python & install dependencies
-# 2. Inisialisasi Airflow lokal & setup koneksi ClickHouse VPS (202.10.42.115) + Source DB
-# 3. Eksekusi DAG Airflow: airflow dags test
-# 4. Jalankan training notebook (Papermill) membaca ClickHouse VPS
-# 5. Salin / sync hasil (airflow.db, mlflow.db / folder mlruns) ke VPS via rsync/scp
+# CI/CD PIPELINE SCRIPT — GITHUB ACTIONS RUNNER
+# Steps:
+# 1. Setup Python environment & install dependencies
+# 2. Initialize local Airflow & register ClickHouse VPS + Source DB connections
+# 3. Execute Airflow DAG: airflow dags test
+# 4. Run training notebook via Papermill (reads from ClickHouse VPS -> logs to MLflow)
+# 5. All outputs (airflow.db, mlflow.db, mlruns/) saved as GitHub Actions artifacts
 # ==============================================================================
 set -euo pipefail
 
@@ -16,7 +16,7 @@ cd "$ROOT_DIR"
 step() { echo; echo "==> $*"; }
 
 # -----------------------------------------------------------------------------
-# Konfigurasi Target VPS & Database
+# Configuration — VPS & Database
 # -----------------------------------------------------------------------------
 export CLICKHOUSE_HOST="${CLICKHOUSE_HOST:-202.10.42.115}"
 export CLICKHOUSE_PORT="${CLICKHOUSE_PORT:-8123}"
@@ -25,7 +25,7 @@ export CLICKHOUSE_PASSWORD="${CLICKHOUSE_PASSWORD:-airflow_etl}"
 export CLICKHOUSE_DB="${CLICKHOUSE_DB:-erp_ai4i}"
 export CLICKHOUSE_TABLE="${CLICKHOUSE_TABLE:-machine_operation}"
 
-# Mapping untuk notebook
+# Aliases for notebook environment variables
 export CH_HOST="$CLICKHOUSE_HOST"
 export CH_PORT="$CLICKHOUSE_PORT"
 export CH_USER="$CLICKHOUSE_USER"
@@ -35,28 +35,23 @@ export CH_TABLE="$CLICKHOUSE_TABLE"
 export DATA_SOURCE="clickhouse"
 export MLFLOW_TRACKING_URI="sqlite:///$ROOT_DIR/mlflow.db"
 
-# Source DB (Oracle / PostgreSQL) di VPS
+# Source DB (Oracle / PostgreSQL) on VPS
 export SOURCE_DB_HOST="${SOURCE_DB_HOST:-202.10.42.115}"
 export SOURCE_DB_PORT="${SOURCE_DB_PORT:-5432}"
 export SOURCE_DB_USER="${SOURCE_DB_USER:-airflow_etl}"
 export SOURCE_DB_PASSWORD="${SOURCE_DB_PASSWORD:-airflow_etl}"
 export SOURCE_DB_NAME="${SOURCE_DB_NAME:-erp_ai4i}"
 
-VPS_HOST="${SSH_HOST:-202.10.42.115}"
-VPS_USER="${SSH_USER:-root}"
-VPS_PORT="${SSH_PORT:-22}"
-VPS_APP_DIR="${APP_DIR:-/root/ai4i-thesis-erp}"
-
 export AIRFLOW_HOME="${AIRFLOW_HOME:-$ROOT_DIR/airflow_home}"
-# Default menggunakan etl_postgre_to_clickhouse_mfp atau etl_oracle_to_clickhouse_mfp
+# Default DAG: etl_postgre_to_clickhouse_mfp or etl_oracle_to_clickhouse_mfp
 AIRFLOW_DAG_ID="${AIRFLOW_DAG_ID:-etl_postgre_to_clickhouse_mfp}"
 
 # -----------------------------------------------------------------------------
-# 1. Setup & Aktivasi Virtual Environment
+# 1. Setup & Activate Virtual Environment
 # -----------------------------------------------------------------------------
 step "1/5 Setup Environment & Install Dependencies"
 if [[ ! -d ".venv_runner" ]]; then
-  echo "Membuat virtual environment di runner..."
+  echo "Creating virtual environment on runner..."
   python3 -m venv .venv_runner
 fi
 
@@ -88,23 +83,23 @@ elif [[ -f "$ROOT_DIR/requirements.txt" ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# 2. Inisialisasi Airflow Lokal & Setup Koneksi Database
+# 2. Initialize Local Airflow & Register Database Connections
 # -----------------------------------------------------------------------------
-step "2/5 Inisialisasi Airflow lokal & Register Connections"
+step "2/5 Initialize local Airflow & Register Connections"
 mkdir -p "$AIRFLOW_HOME/dags"
 mkdir -p "$AIRFLOW_HOME/logs"
 mkdir -p "$ROOT_DIR/runs"
 
-# Salin DAGs ke folder AIRFLOW_HOME
+# Copy DAGs to AIRFLOW_HOME
 cp -rf "$ROOT_DIR"/dags/*.py "$AIRFLOW_HOME/dags/" 2>/dev/null || true
 
-# Init DB lokal Airflow (airflow.db) - Airflow 3 memakai "db migrate" (db init sudah dihapus)
+# Initialize local Airflow DB (airflow.db)
 export AIRFLOW__CORE__LOAD_EXAMPLES="False"
 export AIRFLOW__CORE__DAGS_FOLDER="$AIRFLOW_HOME/dags"
 airflow db migrate >/dev/null
 
-# 2a. Koneksi ke ClickHouse VPS
-echo "Mendaftarkan Connection clickhouse_mfp -> $CLICKHOUSE_HOST:$CLICKHOUSE_PORT"
+# 2a. ClickHouse VPS connection
+echo "Registering connection clickhouse_mfp -> $CLICKHOUSE_HOST:$CLICKHOUSE_PORT"
 airflow connections delete clickhouse_mfp 2>/dev/null || true
 airflow connections add clickhouse_mfp \
   --conn-type "generic" \
@@ -115,7 +110,7 @@ airflow connections add clickhouse_mfp \
   --conn-schema "$CLICKHOUSE_DB" \
   --conn-extra '{"secure": false}'
 
-# 2b. Koneksi ke PostgreSQL VPS (postgres_mfp)
+# 2b. PostgreSQL VPS connection (postgres_mfp)
 airflow connections delete postgres_mfp 2>/dev/null || true
 airflow connections add postgres_mfp \
   --conn-type "postgres" \
@@ -125,7 +120,7 @@ airflow connections add postgres_mfp \
   --conn-password "$SOURCE_DB_PASSWORD" \
   --conn-schema "$SOURCE_DB_NAME" 2>/dev/null || true
 
-# 2c. Koneksi ke Oracle VPS jika menggunakan Oracle DAG (oracle_mfp)
+# 2c. Oracle VPS connection (oracle_mfp) — used when running Oracle DAG
 airflow connections delete oracle_mfp 2>/dev/null || true
 airflow connections add oracle_mfp \
   --conn-type "generic" \
@@ -136,60 +131,39 @@ airflow connections add oracle_mfp \
   --conn-extra '{"service_name": "FREEPDB1"}' 2>/dev/null || true
 
 # -----------------------------------------------------------------------------
-# 3. Tes / Jalankan DAG Airflow Secara Synchronous
+# 3. Test / Run Airflow DAG Synchronously
 # -----------------------------------------------------------------------------
-step "3/5 Menjalankan DAG Airflow: $AIRFLOW_DAG_ID"
-echo "Menghubungkan ke ClickHouse VPS ($CLICKHOUSE_HOST)..."
+step "3/5 Running Airflow DAG: $AIRFLOW_DAG_ID"
+echo "Connecting to ClickHouse VPS ($CLICKHOUSE_HOST)..."
 airflow dags test "$AIRFLOW_DAG_ID" || {
-  echo "WARNING: DAG $AIRFLOW_DAG_ID mengalami issue saat test, memeriksa fallback DAG..."
+  echo "WARNING: DAG $AIRFLOW_DAG_ID encountered an issue, trying fallback DAG..."
   if [[ "$AIRFLOW_DAG_ID" != "etl_oracle_to_clickhouse_mfp" ]]; then
     airflow dags test etl_oracle_to_clickhouse_mfp || true
   fi
 }
 
 # -----------------------------------------------------------------------------
-# 4. Jalankan Training Notebook via Papermill
+# 4. Run Training Notebook via Papermill
 # -----------------------------------------------------------------------------
-step "4/5 Eksekusi Notebook Training (Papermill -> MLflow)"
+step "4/5 Execute Training Notebook (Papermill -> MLflow)"
 OUT_NB="$ROOT_DIR/runs/executed_$(date +%Y%m%d_%H%M%S).ipynb"
 NOTEBOOK_PATH="$ROOT_DIR/notebooks/SMOTE_ai4i2020_xgboost_machine_failure.ipynb"
 
 if [[ -f "$NOTEBOOK_PATH" ]]; then
-  python3 -m ipykernel install --user --name test-kernel >/dev/null 2>&1 || true
+  python3 -m ipykernel install --user --name pipeline-kernel >/dev/null 2>&1 || true
   papermill "$NOTEBOOK_PATH" "$OUT_NB" \
     --cwd "$ROOT_DIR/notebooks" \
-    --kernel test-kernel \
+    --kernel pipeline-kernel \
     --log-output
-  echo "Training selesai. Hasil notebook disimpan di $OUT_NB"
+  echo "Training complete. Executed notebook saved at $OUT_NB"
 else
-  echo "WARNING: Notebook $NOTEBOOK_PATH tidak ditemukan, melewati step papermill."
+  echo "WARNING: Notebook $NOTEBOOK_PATH not found, skipping papermill step."
 fi
 
 # -----------------------------------------------------------------------------
-# 5. Salin Output (airflow.db, mlflow.db, mlruns) ke VPS (Optional)
+# 5. All outputs saved as GitHub Actions artifacts
 # -----------------------------------------------------------------------------
-step "5/5 Sinkronisasi Output ke VPS ($VPS_HOST)"
-if command -v rsync >/dev/null 2>&1 && [[ -f "$HOME/.ssh/id_rsa" ]]; then
-  echo "Mengirim hasil ke $VPS_USER@$VPS_HOST:$VPS_APP_DIR via rsync..."
-  
-  if [[ -f "$AIRFLOW_HOME/airflow.db" ]]; then
-    rsync -avz -e "ssh -p $VPS_PORT -o StrictHostKeyChecking=no" \
-      "$AIRFLOW_HOME/airflow.db" "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/airflow.db" || true
-  fi
+step "5/5 Done — airflow.db, mlflow.db & mlruns/ will be uploaded as GitHub Actions artifacts"
+echo "All outputs (airflow.db, mlflow.db, mlruns/, runs/*.ipynb) are handled by the workflow YAML upload-artifact step."
 
-  if [[ -f "$ROOT_DIR/mlflow.db" ]]; then
-    rsync -avz -e "ssh -p $VPS_PORT -o StrictHostKeyChecking=no" \
-      "$ROOT_DIR/mlflow.db" "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/mlflow.db" || true
-  fi
-
-  if [[ -d "$ROOT_DIR/mlruns" ]]; then
-    rsync -avz -e "ssh -p $VPS_PORT -o StrictHostKeyChecking=no" \
-      "$ROOT_DIR/mlruns/" "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/mlruns/" || true
-  fi
-
-  echo "Sinkronisasi ke VPS selesai!"
-else
-  echo "Info: SSH Key tidak ditemukan atau sync dilewati. Hasil tersimpan di GitHub Artifacts."
-fi
-
-step "Selesai! Pipeline test berhasil dijalankan di runner."
+step "Pipeline completed successfully on runner."

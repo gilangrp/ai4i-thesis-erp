@@ -1,4 +1,4 @@
-name: MLOps CI/CD Pipeline (Test on GitHub Actions)
+name: MLOps CI/CD Pipeline
 
 on:
   push:
@@ -11,42 +11,25 @@ on:
       - 'workflows/**'
       - 'sql/**'
       - 'requirements.txt'
-  workflow_dispatch: # Tombol manual "Run workflow" di GitHub UI
+  workflow_dispatch: # Manual "Run workflow" button in GitHub UI
 
 jobs:
-  test-and-sync:
-    name: Run Pipeline on Runner & Sync to VPS
+  run-pipeline:
+    name: Run Pipeline on Runner
     runs-on: ubuntu-latest
 
     steps:
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 2. Setup Python 3.11 di Runner GitHub
+      - name: 2. Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip' # Mempercepat build berikutnya dengan cache
+          cache: 'pip' # Cache pip packages to speed up subsequent runs
 
-      - name: 3. Setup SSH Key untuk Sync ke VPS
-        if: env.SSH_HOST != ''
+      - name: 3. Run Pipeline (Install Airflow -> Run DAG -> Train Notebook)
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST || '202.10.42.115' }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-          SSH_PORT="${{ secrets.SSH_PORT || '22' }}"
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          chmod 644 ~/.ssh/known_hosts
-
-      - name: 4. Jalankan Pipeline (Install Airflow -> Test DAG -> Train Notebook -> Sync VPS)
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST || '202.10.42.115' }}
-          SSH_USER: ${{ secrets.SSH_USER || 'root' }}
-          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
-          APP_DIR: ${{ secrets.APP_DIR || '/root/ai4i-thesis-erp' }}
           CLICKHOUSE_HOST: ${{ secrets.CLICKHOUSE_HOST || '202.10.42.115' }}
           CLICKHOUSE_PORT: ${{ secrets.CLICKHOUSE_PORT || '8123' }}
           CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER || 'airflow_etl' }}
@@ -61,11 +44,11 @@ jobs:
           chmod +x workflows/airflow-to-mlflow/deploy_remote.sh
           bash workflows/airflow-to-mlflow/deploy_remote.sh
 
-      - name: 5. Upload Artifact ke GitHub (Bisa diunduh langsung dari browser)
-        if: always() # Tetap upload meskipun step sebelumnya ada warning
+      - name: 4. Upload Artifacts to GitHub (downloadable from the Actions tab)
+        if: always() # Upload even if a previous step has warnings
         uses: actions/upload-artifact@v4
         with:
-          name: pipeline-test-results
+          name: pipeline-results
           path: |
             airflow_home/airflow.db
             mlflow.db
