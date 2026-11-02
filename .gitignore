@@ -1,5 +1,5 @@
 .venv
 __pycache__
-# mlruns
-# mlflow.db
+mlruns
+mlflow.db
 .DS_Store
