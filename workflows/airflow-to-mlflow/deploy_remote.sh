@@ -58,16 +58,28 @@ fi
 # shellcheck source=/dev/null
 source .venv_runner/bin/activate
 pip install -q --upgrade pip
-echo "Installing Airflow & pipeline dependencies..."
-pip install -q apache-airflow==2.9.1 papermill ipykernel
+echo "Menginstall Airflow & dependensi pipeline..."
+AIRFLOW_VERSION="${AIRFLOW_VERSION:-3.1.8}"
+PYTHON_VERSION="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+case "$PYTHON_VERSION" in
+  3.10|3.11|3.12|3.13) ;;
+  *) echo "ERROR: Airflow $AIRFLOW_VERSION butuh Python 3.10-3.13, runner memakai $PYTHON_VERSION"; exit 1 ;;
+esac
+CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+pip install -q "apache-airflow[postgres]==${AIRFLOW_VERSION}" papermill ipykernel \
+  --constraint "$CONSTRAINT_URL"
+
+# Kunci versi Airflow agar requirements lain tidak mengubah/men-downgrade-nya
+AIRFLOW_PIN_FILE="$(mktemp)"
+echo "apache-airflow==${AIRFLOW_VERSION}" > "$AIRFLOW_PIN_FILE"
 
 if [[ -f "$ROOT_DIR/dags/requirements-airflow.txt" ]]; then
-  pip install -q -r "$ROOT_DIR/dags/requirements-airflow.txt" || true
+  pip install -q -r "$ROOT_DIR/dags/requirements-airflow.txt" -c "$AIRFLOW_PIN_FILE" || true
 fi
 if [[ -f "$ROOT_DIR/notebooks/requirements.txt" ]]; then
-  pip install -q -r "$ROOT_DIR/notebooks/requirements.txt" || true
+  pip install -q -r "$ROOT_DIR/notebooks/requirements.txt" -c "$AIRFLOW_PIN_FILE" || true
 elif [[ -f "$ROOT_DIR/requirements.txt" ]]; then
-  pip install -q -r "$ROOT_DIR/requirements.txt" || true
+  pip install -q -r "$ROOT_DIR/requirements.txt" -c "$AIRFLOW_PIN_FILE" || true
 fi
 
 # -----------------------------------------------------------------------------
@@ -83,7 +95,8 @@ cp -rf "$ROOT_DIR"/dags/*.py "$AIRFLOW_HOME/dags/" 2>/dev/null || true
 
 # Initialize local Airflow DB (airflow.db)
 export AIRFLOW__CORE__LOAD_EXAMPLES="False"
-airflow db init >/dev/null
+export AIRFLOW__CORE__DAGS_FOLDER="$AIRFLOW_HOME/dags"
+airflow db migrate >/dev/null
 
 # 2a. ClickHouse VPS connection
 echo "Registering connection clickhouse_mfp -> $CLICKHOUSE_HOST:$CLICKHOUSE_PORT"
