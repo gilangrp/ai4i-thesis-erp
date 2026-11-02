@@ -51,7 +51,12 @@ jobs:
           CLICKHOUSE_PORT: ${{ secrets.CLICKHOUSE_PORT || '8123' }}
           CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER || 'airflow_etl' }}
           CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD || 'airflow_etl' }}
-          CLICKHOUSE_DB: ${{ secrets.CLICKHOUSE_DB || 'default' }}
+          CLICKHOUSE_DB: ${{ secrets.CLICKHOUSE_DB || 'erp_ai4i' }}
+          SOURCE_DB_HOST: ${{ secrets.SOURCE_DB_HOST || '202.10.42.115' }}
+          SOURCE_DB_PORT: ${{ secrets.SOURCE_DB_PORT || '5432' }}
+          SOURCE_DB_USER: ${{ secrets.SOURCE_DB_USER || 'airflow_etl' }}
+          SOURCE_DB_PASSWORD: ${{ secrets.SOURCE_DB_PASSWORD || 'airflow_etl' }}
+          SOURCE_DB_NAME: ${{ secrets.SOURCE_DB_NAME || 'erp_ai4i' }}
         run: |
           chmod +x workflows/airflow-to-mlflow/deploy_remote.sh
           bash workflows/airflow-to-mlflow/deploy_remote.sh

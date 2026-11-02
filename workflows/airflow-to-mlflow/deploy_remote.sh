@@ -31,14 +31,16 @@ export CH_PORT="$CLICKHOUSE_PORT"
 export CH_USER="$CLICKHOUSE_USER"
 export CH_PASSWORD="$CLICKHOUSE_PASSWORD"
 export CH_DATABASE="$CLICKHOUSE_DB"
-export CH_TABLE="$CLICKHOUSE_TABLE"
+export CH_TABLE="${CLICKHOUSE_DB}.${CLICKHOUSE_TABLE}"
 export DATA_SOURCE="clickhouse"
 export MLFLOW_TRACKING_URI="sqlite:///$ROOT_DIR/mlflow.db"
 
 # Source DB (Oracle / PostgreSQL) di VPS
 export SOURCE_DB_HOST="${SOURCE_DB_HOST:-202.10.42.115}"
+export SOURCE_DB_PORT="${SOURCE_DB_PORT:-5432}"
 export SOURCE_DB_USER="${SOURCE_DB_USER:-airflow_etl}"
 export SOURCE_DB_PASSWORD="${SOURCE_DB_PASSWORD:-airflow_etl}"
+export SOURCE_DB_NAME="${SOURCE_DB_NAME:-erp_ai4i}"
 
 VPS_HOST="${SSH_HOST:-202.10.42.115}"
 VPS_USER="${SSH_USER:-root}"
@@ -118,10 +120,10 @@ airflow connections delete postgres_mfp 2>/dev/null || true
 airflow connections add postgres_mfp \
   --conn-type "postgres" \
   --conn-host "$SOURCE_DB_HOST" \
-  --conn-port "5432" \
+  --conn-port "$SOURCE_DB_PORT" \
   --conn-login "$SOURCE_DB_USER" \
   --conn-password "$SOURCE_DB_PASSWORD" \
-  --conn-schema "erp_ai4i" 2>/dev/null || true
+  --conn-schema "$SOURCE_DB_NAME" 2>/dev/null || true
 
 # 2c. Koneksi ke Oracle VPS jika menggunakan Oracle DAG (oracle_mfp)
 airflow connections delete oracle_mfp 2>/dev/null || true
