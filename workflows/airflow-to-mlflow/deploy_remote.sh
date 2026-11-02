@@ -6,7 +6,7 @@
 # 2. Inisialisasi Airflow lokal & setup koneksi ClickHouse VPS (202.10.42.115) + Source DB
 # 3. Eksekusi DAG Airflow: airflow dags test
 # 4. Jalankan training notebook (Papermill) membaca ClickHouse VPS
-# 5. Salin / sync hasil (airflow.db, mlflow.db / folder mlruns) ke VPS via rsync/scp
+# 5. Simpan semua output (airflow.db, mlflow.db, mlruns/) sebagai GitHub Actions artifact
 # ==============================================================================
 set -euo pipefail
 
@@ -41,11 +41,6 @@ export SOURCE_DB_PORT="${SOURCE_DB_PORT:-5432}"
 export SOURCE_DB_USER="${SOURCE_DB_USER:-airflow_etl}"
 export SOURCE_DB_PASSWORD="${SOURCE_DB_PASSWORD:-airflow_etl}"
 export SOURCE_DB_NAME="${SOURCE_DB_NAME:-erp_ai4i}"
-
-VPS_HOST="${SSH_HOST:-202.10.42.115}"
-VPS_USER="${SSH_USER:-root}"
-VPS_PORT="${SSH_PORT:-22}"
-VPS_APP_DIR="${APP_DIR:-/root/ai4i-thesis-erp}"
 
 export AIRFLOW_HOME="${AIRFLOW_HOME:-$ROOT_DIR/airflow_home}"
 # Default menggunakan etl_postgre_to_clickhouse_mfp atau etl_oracle_to_clickhouse_mfp
@@ -153,30 +148,9 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 5. Salin Output (airflow.db, mlflow.db, mlruns) ke VPS (Optional)
+# 5. Simpan Output sebagai GitHub Actions Artifact
 # -----------------------------------------------------------------------------
-step "5/5 Sinkronisasi Output ke VPS ($VPS_HOST)"
-if command -v rsync >/dev/null 2>&1 && [[ -f "$HOME/.ssh/id_rsa" ]]; then
-  echo "Mengirim hasil ke $VPS_USER@$VPS_HOST:$VPS_APP_DIR via rsync..."
-  
-  if [[ -f "$AIRFLOW_HOME/airflow.db" ]]; then
-    rsync -avz -e "ssh -p $VPS_PORT -o StrictHostKeyChecking=no" \
-      "$AIRFLOW_HOME/airflow.db" "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/airflow.db" || true
-  fi
-
-  if [[ -f "$ROOT_DIR/mlflow.db" ]]; then
-    rsync -avz -e "ssh -p $VPS_PORT -o StrictHostKeyChecking=no" \
-      "$ROOT_DIR/mlflow.db" "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/mlflow.db" || true
-  fi
-
-  if [[ -d "$ROOT_DIR/mlruns" ]]; then
-    rsync -avz -e "ssh -p $VPS_PORT -o StrictHostKeyChecking=no" \
-      "$ROOT_DIR/mlruns/" "$VPS_USER@$VPS_HOST:$VPS_APP_DIR/mlruns/" || true
-  fi
-
-  echo "Sinkronisasi ke VPS selesai!"
-else
-  echo "Info: SSH Key tidak ditemukan atau sync dilewati. Hasil tersimpan di GitHub Artifacts."
-fi
+step "5/5 Selesai — airflow.db, mlflow.db & mlruns/ disimpan sebagai GitHub Actions artifact"
+echo "Semua output (airflow.db, mlflow.db, mlruns/, runs/*.ipynb) akan diupload sebagai artifact oleh workflow YAML."
 
 step "Selesai! Pipeline test berhasil dijalankan di runner."

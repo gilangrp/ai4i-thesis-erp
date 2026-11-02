@@ -14,8 +14,8 @@ on:
   workflow_dispatch: # Tombol manual "Run workflow" di GitHub UI
 
 jobs:
-  test-and-sync:
-    name: Run Pipeline on Runner & Sync to VPS
+  test-pipeline:
+    name: Run Pipeline on Runner
     runs-on: ubuntu-latest
 
     steps:
@@ -28,25 +28,8 @@ jobs:
           python-version: '3.11'
           cache: 'pip' # Mempercepat build berikutnya dengan cache
 
-      - name: 3. Setup SSH Key untuk Sync ke VPS
-        if: env.SSH_HOST != ''
+      - name: 3. Jalankan Pipeline (Install Airflow -> Test DAG -> Train Notebook)
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST || '202.10.42.115' }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-          SSH_PORT="${{ secrets.SSH_PORT || '22' }}"
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          chmod 644 ~/.ssh/known_hosts
-
-      - name: 4. Jalankan Pipeline (Install Airflow -> Test DAG -> Train Notebook -> Sync VPS)
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST || '202.10.42.115' }}
-          SSH_USER: ${{ secrets.SSH_USER || 'root' }}
-          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
-          APP_DIR: ${{ secrets.APP_DIR || '/root/ai4i-thesis-erp' }}
           CLICKHOUSE_HOST: ${{ secrets.CLICKHOUSE_HOST || '202.10.42.115' }}
           CLICKHOUSE_PORT: ${{ secrets.CLICKHOUSE_PORT || '8123' }}
           CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER || 'airflow_etl' }}
@@ -61,7 +44,7 @@ jobs:
           chmod +x workflows/airflow-to-mlflow/deploy_remote.sh
           bash workflows/airflow-to-mlflow/deploy_remote.sh
 
-      - name: 5. Upload Artifact ke GitHub (Bisa diunduh langsung dari browser)
+      - name: 4. Upload Artifact ke GitHub (Bisa diunduh langsung dari browser)
         if: always() # Tetap upload meskipun step sebelumnya ada warning
         uses: actions/upload-artifact@v4
         with:
