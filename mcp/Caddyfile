@@ -1,0 +1,8 @@
+# HTTPS otomatis (Let's Encrypt). DOMAIN diisi dari .env, contoh: mcp.contoh.com
+# Domain harus mengarah (A record) ke IP VPS, port 80 & 443 terbuka.
+{$DOMAIN} {
+	reverse_proxy mcp-machine-operation:8000 {
+		# Penting untuk streaming (SSE) Streamable HTTP
+		flush_interval -1
+	}
+}

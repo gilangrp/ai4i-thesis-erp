@@ -1,0 +1,39 @@
+services:
+  mcp-machine-operation:
+    build: .
+    container_name: mcp-machine-operation
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Agar container bisa menjangkau PostgreSQL yang berjalan di host VPS
+    # (POSTGRES_HOST=host.docker.internal).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Tidak dipublish ke internet; hanya Caddy yang mengaksesnya.
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2
+    container_name: mcp-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - mcp-machine-operation
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "machine-operation": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://DOMAIN-KAMU/mcp",
+        "--header-file",
+        "/Users/USERNAME/.config/mcp-machine-operation.headers"
+      ]
+    }
+  }
+}
