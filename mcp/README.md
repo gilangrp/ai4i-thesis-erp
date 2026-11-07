@@ -47,6 +47,15 @@ Semua query memakai parameter/identifier aman, tidak ada SQL bebas dari AI.
    docker compose up -d --build
    docker compose logs -f mcp-machine-operation
    ```
+   Untuk menjalankan tanpa Docker, dari root repository:
+   ```bash
+   cd mcp
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   python main.py
+   ```
+   Pastikan `.env` sudah dikonfigurasi. Jika PostgreSQL berjalan di mesin yang sama, atur `POSTGRES_HOST=127.0.0.1` (bukan `host.docker.internal`).
 5. **Uji**:
    ```bash
    curl https://DOMAIN/health
