@@ -308,6 +308,103 @@
       color: #94a3b8;
       margin-top: 2px;
     }
+
+    .batch-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .batch-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    .batch-item-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .batch-item-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .batch-item-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      flex: 0 0 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .icon-btn:hover:not(:disabled) {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .icon-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .add-item-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .batch-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .helper-text {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 16px;
+      }
+
+      .grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .batch-item {
+        padding: 10px;
+      }
+
+      .batch-item .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 
@@ -337,26 +434,8 @@
     </div>
 
     <div class="grid">
-      <!-- 1. System Health & Reload -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <span>System Status & Model Ops</span>
-          </div>
-        </div>
-        <p style="font-size:0.85rem; color:var(--muted)">Periksa status API, detail model champion yang dimuat, atau
-          reload model dari MLflow.</p>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn btn-secondary" onclick="callApi('/health', 'GET', 'healthRes')">GET /health</button>
-          <button class="btn btn-secondary" onclick="callApi('/model-info', 'GET', 'healthRes')">GET
-            /model-info</button>
-          <button class="btn btn-danger" onclick="callApi('/reload', 'POST', 'healthRes')">POST /reload</button>
-        </div>
-        <div class="response-box" id="healthRes">...</div>
-      </div>
-
-      <!-- 2. Single Prediction -->
-      <div class="card">
+      <!-- Single Prediction -->
+      <div class="card" style="grid-column: 1 / -1;">
         <div class="card-header">
           <div class="card-title">
             <span class="badge badge-post">POST</span>
@@ -406,7 +485,7 @@
         <div class="response-box" id="singleRes">...</div>
       </div>
 
-      <!-- 3. Batch Prediction -->
+      <!-- Batch Prediction -->
       <div class="card" style="grid-column: 1 / -1;">
         <div class="card-header">
           <div class="card-title">
@@ -414,41 +493,80 @@
             <span>Batch Prediction (/predict/batch)</span>
           </div>
         </div>
-        <p style="font-size:0.85rem; color:var(--muted)">Kirim beberapa data sekaligus (JSON payload format
-          <code>{ "items": [...] }</code>).
-        </p>
+        <p class="helper-text">Isi data setiap mesin, gunakan tombol + untuk menambahkan data, atau ikon hapus untuk mengurangi daftar.</p>
 
-        <textarea id="batchPayload">{
-  "items": [
-    {
-      "type": "L",
-      "air_temp_k": 298.1,
-      "process_temp_k": 308.6,
-      "rpm": 1551,
-      "torque_nm": 42.8,
-      "tool_wear_min": 0
-    },
-    {
-      "type": "L",
-      "air_temp_k": 300.5,
-      "process_temp_k": 310.9,
-      "rpm": 1500,
-      "torque_nm": 55.0,
-      "tool_wear_min": 215
-    }
-  ]
-}</textarea>
+        <form id="batchForm" onsubmit="event.preventDefault(); submitBatchPredict();">
+          <div class="batch-list" id="batchList"></div>
+          <div class="batch-actions">
+            <button type="button" class="btn btn-secondary add-item-btn" onclick="addBatchItem()"
+              aria-label="Tambah data mesin">
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+              Tambah data
+            </button>
+            <span class="helper-text" id="batchCount">2 data</span>
+            <button type="submit" class="btn">Prediksi batch</button>
+          </div>
+        </form>
 
-        <div style="display:flex; gap:8px;">
-          <button class="btn" onclick="submitBatchPredict()">Predict Batch</button>
-        </div>
-
-        <div class="response-box" id="batchRes" style="max-height: 250px;">...</div>
+        <div class="response-box" id="batchRes" style="max-height: 250px;">Hasil prediksi akan tampil di sini.</div>
       </div>
     </div>
   </div>
 
+  <template id="batchItemTemplate">
+    <div class="batch-item">
+      <div class="batch-item-content">
+        <div class="batch-item-header">
+          <span class="batch-item-title"></span>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Product Type</label>
+            <select data-field="type">
+              <option value="L">L (Low)</option>
+              <option value="M">M (Medium)</option>
+              <option value="H">H (High)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tool Wear [min]</label>
+            <input data-field="tool_wear_min" type="number" value="0" min="0" max="1000" required>
+          </div>
+          <div class="form-group">
+            <label>Air Temp [K]</label>
+            <input data-field="air_temp_k" type="number" value="298.1" min="250" max="350" step="0.1" required>
+          </div>
+          <div class="form-group">
+            <label>Process Temp [K]</label>
+            <input data-field="process_temp_k" type="number" value="308.6" min="250" max="400" step="0.1" required>
+          </div>
+          <div class="form-group">
+            <label>Rotational Speed [RPM]</label>
+            <input data-field="rpm" type="number" value="1551" min="1" max="10000" required>
+          </div>
+          <div class="form-group">
+            <label>Torque [Nm]</label>
+            <input data-field="torque_nm" type="number" value="42.8" min="0" max="200" step="0.1" required>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="icon-btn remove-batch-item" aria-label="Hapus data mesin">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M4 7h16M10 11v6m4-6v6M5 7l1 13h12l1-13M9 7V4h6v3" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+  </template>
+
   <script>
+    const batchSamples = [
+      { type: "L", air_temp_k: 298.1, process_temp_k: 308.6, rpm: 1551, torque_nm: 42.8, tool_wear_min: 0 },
+      { type: "L", air_temp_k: 300.5, process_temp_k: 310.9, rpm: 1500, torque_nm: 55.0, tool_wear_min: 215 },
+    ];
+
     function getBaseUrl() {
       return document.getElementById("baseUrl").value.replace(/\/+$/, '');
     }
@@ -468,10 +586,16 @@
 
         const res = await fetch(`${getBaseUrl()}${endpoint}`, opts);
         const data = await res.json();
+        if (!res.ok) {
+          const detail = data.detail || res.statusText;
+          target.textContent = `Permintaan gagal (${res.status}): ${typeof detail === "string" ? detail : JSON.stringify(detail)}`;
+          return null;
+        }
         target.textContent = JSON.stringify(data, null, 2);
         return data;
       } catch (err) {
         target.textContent = `Error: ${err.message}\nPastikan FastAPI aktif dan CORS diizinkan jika beda host.`;
+        return null;
       }
     }
 
@@ -505,17 +629,43 @@
       document.getElementById("p_tool_wear").value = 215;
     }
 
+    function updateBatchItems() {
+      const items = [...document.querySelectorAll(".batch-item")];
+      document.getElementById("batchCount").textContent = `${items.length} data`;
+      items.forEach((item, index) => {
+        item.querySelector(".batch-item-title").textContent = `Data mesin ${index + 1}`;
+        item.querySelector(".remove-batch-item").disabled = items.length === 1;
+      });
+    }
+
+    function addBatchItem(values = batchSamples[0]) {
+      const template = document.getElementById("batchItemTemplate");
+      const item = template.content.firstElementChild.cloneNode(true);
+      Object.entries(values).forEach(([field, value]) => {
+        item.querySelector(`[data-field="${field}"]`).value = value;
+      });
+      item.querySelector(".remove-batch-item").addEventListener("click", () => {
+        item.remove();
+        updateBatchItems();
+      });
+      document.getElementById("batchList").appendChild(item);
+      updateBatchItems();
+    }
+
     async function submitBatchPredict() {
-      const raw = document.getElementById("batchPayload").value;
-      let jsonPayload;
-      try {
-        jsonPayload = JSON.parse(raw);
-      } catch (err) {
-        document.getElementById("batchRes").textContent = "JSON tidak valid: " + err.message;
-        return;
-      }
+      const items = [...document.querySelectorAll(".batch-item")].map((item) => ({
+        type: item.querySelector('[data-field="type"]').value,
+        air_temp_k: parseFloat(item.querySelector('[data-field="air_temp_k"]').value),
+        process_temp_k: parseFloat(item.querySelector('[data-field="process_temp_k"]').value),
+        rpm: parseInt(item.querySelector('[data-field="rpm"]').value, 10),
+        torque_nm: parseFloat(item.querySelector('[data-field="torque_nm"]').value),
+        tool_wear_min: parseInt(item.querySelector('[data-field="tool_wear_min"]').value, 10),
+      }));
+      const jsonPayload = { items };
       await callApi("/predict/batch", "POST", "batchRes", jsonPayload);
     }
+
+    batchSamples.forEach((sample) => addBatchItem(sample));
   </script>
 </body>
 
