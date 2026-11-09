@@ -22,6 +22,7 @@ import mlflow.xgboost
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from mlflow.tracking import MlflowClient
 from pydantic import BaseModel, Field
@@ -151,6 +152,16 @@ def _predict(rows: list[Reading]) -> list[Prediction]:
 
 
 # ----------------------------------------------------------------- endpoints
+@app.get("/main")
+def main_page():
+    return FileResponse(Path(__file__).resolve().parent / "index.html")
+
+
+@app.get("/banner-image.jpeg")
+def banner_image():
+    return FileResponse(Path(__file__).resolve().parent / "banner-image.jpeg")
+
+
 @app.get("/health")
 def health():
     try:
