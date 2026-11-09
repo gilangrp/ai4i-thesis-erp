@@ -1,0 +1,43 @@
+Contoh prompt untuk Claude
+=========================
+
+Ganti rentang tanggal atau jumlah record sesuai kebutuhan. Pastikan MCP server
+sudah terhubung di Claude sebelum menggunakan prompt berikut.
+
+1. Lihat struktur tabel
+   Gunakan tool get_table_schema untuk menampilkan kolom dan tipe data pada
+   tabel machine_operation. Jelaskan kolom-kolom yang relevan secara singkat.
+
+2. Hitung semua record
+   Gunakan tool count_machine_operations untuk menghitung total record pada
+   tabel machine_operation. Sebutkan jumlahnya dan tabel yang dihitung.
+
+3. Ambil beberapa record
+   Gunakan tool get_machine_operations dengan limit 10. Tampilkan hasilnya
+   dalam tabel ringkas dan jangan mengarang nilai yang tidak ada di data.
+
+4. Filter berdasarkan tanggal
+   Gunakan tool get_machine_operations_by_date untuk menampilkan record
+   tanggal 2026-11-07. Ringkas hasilnya dan sebutkan jumlah record yang
+   dikembalikan.
+
+   Catatan: tool filter tanggal hanya berfungsi jika DATE_COLUMN sudah
+   dikonfigurasi di file .env server.
+
+5. Hitung record dalam rentang tanggal
+   Gunakan tool count_machine_operations untuk menghitung record dari
+   2026-11-01 sampai 2026-11-07, inklusif.
+
+6. Analisis sederhana
+   Ambil record machine_operation tanggal 2026-11-07 menggunakan tool yang
+   tersedia. Ringkas pola atau nilai yang terlihat pada data tersebut.
+   Bedakan fakta dari dugaan, dan jelaskan jika data yang tersedia tidak cukup
+   untuk menyimpulkan sesuatu.
+
+Batasan
+-------
+- Gunakan hanya data yang dikembalikan oleh tools MCP ini.
+- Server ini read-only: tidak dapat menambah, mengubah, atau menghapus data.
+- Jika tool filter tanggal melaporkan DATE_COLUMN belum dikonfigurasi, minta
+  administrator mengaturnya di .env server.
+
