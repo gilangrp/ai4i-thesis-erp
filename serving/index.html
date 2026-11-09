@@ -60,26 +60,6 @@
       color: var(--muted);
     }
 
-    .base-url-input {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--card-bg);
-      padding: 6px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-    }
-
-    .base-url-input input {
-      background: transparent;
-      border: none;
-      color: var(--primary);
-      font-weight: 600;
-      font-size: 0.875rem;
-      outline: none;
-      width: 200px;
-    }
-
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
@@ -222,11 +202,11 @@
       padding: 12px;
       max-height: 200px;
       overflow-y: auto;
-      font-family: monospace;
-      font-size: 0.8rem;
+      font-size: 0.9rem;
+      line-height: 1.7;
       white-space: pre-wrap;
-      word-break: break-all;
-      color: #38bdf8;
+      word-break: normal;
+      color: var(--text);
     }
 
     .result-pill {
@@ -414,11 +394,6 @@
     <header>
       <div class="title-group">
         <h1>⚙️ Machine Failure Prediction API Client</h1>
-        <p>Testing & Monitoring Dashboard untuk FastAPI Serving</p>
-      </div>
-      <div class="base-url-input">
-        <label for="baseUrl" style="font-size:0.75rem; color:var(--muted)">Base URL:</label>
-        <input type="text" id="baseUrl" value="http://localhost:8000">
       </div>
     </header>
 
@@ -428,8 +403,7 @@
       <div class="hero-overlay">
         <span class="hero-tag">⚡ AI Predictive Maintenance</span>
         <div class="hero-title">Industrial Machine Operation & Failure Monitoring</div>
-        <div class="hero-desc">Sistem deteksi dini anomali dan prediksi kerusakan mesin manufaktur berbasis XGBoost &
-          MLflow Registry secara real-time.</div>
+        <div class="hero-desc">Real-time early anomaly detection and machine failure prediction system for manufacturing equipment, based on XGBoost and MLflow Registry.</div>
       </div>
     </div>
 
@@ -482,7 +456,7 @@
           </div>
         </form>
 
-        <div class="response-box" id="singleRes">...</div>
+        <div class="response-box" id="singleRes">Prediction results will appear here.</div>
       </div>
 
       <!-- Batch Prediction -->
@@ -499,18 +473,18 @@
           <div class="batch-list" id="batchList"></div>
           <div class="batch-actions">
             <button type="button" class="btn btn-secondary add-item-btn" onclick="addBatchItem()"
-              aria-label="Tambah data mesin">
+              aria-label="Add data mesin">
               <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
               </svg>
-              Tambah data
+              Add data
             </button>
             <span class="helper-text" id="batchCount">2 data</span>
             <button type="submit" class="btn">Prediksi batch</button>
           </div>
         </form>
 
-        <div class="response-box" id="batchRes" style="max-height: 250px;">Hasil prediksi akan tampil di sini.</div>
+        <div class="response-box" id="batchRes" style="max-height: 250px;">Prediction results will appear here.</div>
       </div>
     </div>
   </div>
@@ -562,13 +536,46 @@
   </template>
 
   <script>
+    const API_BASE_URL = "http://localhost:8000";
     const batchSamples = [
       { type: "L", air_temp_k: 298.1, process_temp_k: 308.6, rpm: 1551, torque_nm: 42.8, tool_wear_min: 0 },
       { type: "L", air_temp_k: 300.5, process_temp_k: 310.9, rpm: 1500, torque_nm: 55.0, tool_wear_min: 215 },
     ];
 
     function getBaseUrl() {
-      return document.getElementById("baseUrl").value.replace(/\/+$/, '');
+      return API_BASE_URL.replace(/\/+$/, '');
+    }
+
+    function formatPredictionResult(result, index = null) {
+      const isFailure = result.label === "FAILURE";
+      const title = index === null ? "Prediction result" : `Machine ${index + 1}`;
+      const status = isFailure
+        ? "⚠️ Failure risk detected"
+        : "✅ Machine predicted to be operating normally";
+      const percent = new Intl.NumberFormat("en-US", {
+        style: "percent",
+        maximumFractionDigits: 1,
+      });
+
+      return [
+        title,
+        status,
+        `Failure risk score: ${percent.format(result.probability)}`,
+        `Decision threshold: ${percent.format(result.threshold)}`,
+        `Model version: ${result.model_version}`,
+      ].join("\n");
+    }
+
+    function formatPredictionResponse(data) {
+      if (Array.isArray(data)) {
+        return `Prediction results for ${data.length} machines\n\n${data
+          .map((result, index) => formatPredictionResult(result, index))
+          .join("\n\n")}`;
+      }
+      if (data && typeof data === "object" && "prediction" in data) {
+        return formatPredictionResult(data);
+      }
+      return JSON.stringify(data, null, 2);
     }
 
     async function callApi(endpoint, method, targetElemId, body = null) {
@@ -591,10 +598,10 @@
           target.textContent = `Permintaan gagal (${res.status}): ${typeof detail === "string" ? detail : JSON.stringify(detail)}`;
           return null;
         }
-        target.textContent = JSON.stringify(data, null, 2);
+        target.textContent = formatPredictionResponse(data);
         return data;
       } catch (err) {
-        target.textContent = `Error: ${err.message}\nPastikan FastAPI aktif dan CORS diizinkan jika beda host.`;
+        target.textContent = `Error: ${err.message}\nMake sure FastAPI is running and CORS is enabled if using a different host.`;
         return null;
       }
     }
