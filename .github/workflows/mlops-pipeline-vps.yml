@@ -1,0 +1,59 @@
+name: MLOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    # branches: [ 'temp' ]
+    paths:
+      - 'dags/**'
+      - 'notebooks/**'
+      - 'serving/**'
+      - 'scripts/**'
+      - 'workflows/**'
+      - 'sql/**'
+      - 'requirements.txt'
+  workflow_dispatch: # Manual "Run workflow" button in GitHub UI
+
+jobs:
+  run-pipeline:
+    name: Run Pipeline on Runner
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip' # Cache pip packages to speed up subsequent runs
+
+      - name: 3. Run Pipeline (Install Airflow -> Run DAG -> Train Notebook)
+        env:
+          CLICKHOUSE_HOST: ${{ secrets.CLICKHOUSE_HOST || '202.10.42.115' }}
+          CLICKHOUSE_PORT: ${{ secrets.CLICKHOUSE_PORT || '8123' }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER || 'airflow_etl' }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD || 'airflow_etl' }}
+          CLICKHOUSE_DB: ${{ secrets.CLICKHOUSE_DB || 'erp_ai4i' }}
+          SOURCE_DB_HOST: ${{ secrets.SOURCE_DB_HOST || '202.10.42.115' }}
+          SOURCE_DB_PORT: ${{ secrets.SOURCE_DB_PORT || '5432' }}
+          SOURCE_DB_USER: ${{ secrets.SOURCE_DB_USER || 'airflow_etl' }}
+          SOURCE_DB_PASSWORD: ${{ secrets.SOURCE_DB_PASSWORD || 'airflow_etl' }}
+          SOURCE_DB_NAME: ${{ secrets.SOURCE_DB_NAME || 'erp_ai4i' }}
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI || 'http://202.10.42.115:5000' }}
+        run: |
+          chmod +x workflows/airflow-to-mlflow/deploy_remote_vps.sh
+          bash workflows/airflow-to-mlflow/deploy_remote_vps.sh
+
+      - name: 4. Upload Artifacts to GitHub (downloadable from the Actions tab)
+        if: always() # Upload even if a previous step has warnings
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-results
+          path: |
+            airflow_home/airflow.db
+            mlflow.db
+            mlruns/
+            runs/*.ipynb
+          retention-days: 7
