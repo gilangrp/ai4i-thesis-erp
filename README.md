@@ -110,6 +110,12 @@ cd serving && uvicorn app:app --reload --port 8000
 pm2 start ecosystem.config.js
 ```
 
+API secara default memuat model dari alias `champion` di MLflow. Untuk memuat model
+lokal, atur `IS_MODEL_FROM_MLFLOW=0` di `.env`, lalu pastikan kedua file ini tersedia:
+`serving/model/model.ubj` dan `serving/model/model_meta.json`. Metadata JSON berisi
+`features`, `type_map`, dan `threshold` yang harus sesuai dengan model. Nilai
+`IS_MODEL_FROM_MLFLOW` hanya menerima `1` atau `0`; setelah mengubahnya, restart API.
+
 **Daftar Endpoint API:**
 | Method | Endpoint | Keterangan |
 |---|---|---|

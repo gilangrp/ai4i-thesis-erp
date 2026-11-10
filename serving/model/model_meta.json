@@ -1,0 +1,21 @@
+{
+  "variant": "smote",
+  "features": [
+    "type_enc",
+    "air_temp_k",
+    "process_temp_k",
+    "rpm",
+    "torque_nm",
+    "tool_wear_min",
+    "temp_diff_k",
+    "power_w",
+    "wear_torque"
+  ],
+  "type_map": {
+    "L": 0,
+    "M": 1,
+    "H": 2
+  },
+  "threshold": 0.7709268927574158,
+  "run_id": "bb5bbf293b22408ca8baed993ec44d9c"
+}
