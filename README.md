@@ -104,11 +104,15 @@ Model dimuat langsung dari MLflow Model Registry (`models:/machine_failure_xgb@c
 
 ```bash
 # Mode Development
-cd serving && uvicorn app:app --reload --port 8000
+cd serving && uvicorn app:app --reload --host 0.0.0.0 --port 8000
 
 # Mode Produksi (via PM2)
 pm2 start ecosystem.config.js
 ```
+
+The API listens on all network interfaces. Allow TCP port 8000 in the server and
+provider firewalls, then open `http://<server-ip>:8000/main`. Restrict access to
+trusted client IPs in the firewall when possible.
 
 API secara default memuat model dari alias `champion` di MLflow. Untuk memuat model
 lokal, atur `IS_MODEL_FROM_MLFLOW=0` di `.env`, lalu pastikan kedua file ini tersedia:
