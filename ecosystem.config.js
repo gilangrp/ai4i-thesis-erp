@@ -8,7 +8,7 @@ module.exports = {
       // uvicorn dari virtualenv project; interpreter "none" = jalankan sebagai binary langsung
       script: path.join(__dirname, ".venv", "bin", "uvicorn"),
       interpreter: "none",
-      args: `app:app --host ${process.env.API_HOST || "0.0.0.0"} --port ${process.env.API_PORT || 8000} --workers ${process.env.UVICORN_WORKERS || 1}`,
+      args: `app:app --host 127.0.0.1 --port 8000 --workers ${process.env.UVICORN_WORKERS || 1}`,
       cwd: path.join(__dirname, "serving"),
       autorestart: true,
       max_restarts: 10,
