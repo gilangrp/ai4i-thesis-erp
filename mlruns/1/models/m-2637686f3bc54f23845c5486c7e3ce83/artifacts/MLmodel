@@ -1,0 +1,39 @@
+artifact_path: /Users/gilangrpratama/Coding/ai4i-thesis-erp/mlruns/1/models/m-2637686f3bc54f23845c5486c7e3ce83/artifacts
+flavors:
+  python_function:
+    data: model.ubj
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.11.9
+  xgboost:
+    code: null
+    data: model.ubj
+    model_class: xgboost.sklearn.XGBClassifier
+    model_format: ubj
+    xgb_version: 3.2.0
+is_signature_from_type_hint: false
+mlflow_version: 3.18.0
+model_id: m-2637686f3bc54f23845c5486c7e3ce83
+model_size_bytes: 163830
+model_uuid: m-2637686f3bc54f23845c5486c7e3ce83
+prompts: null
+run_id: d58d666393d24bd68bb23b0cf9353713
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "double", "name": "type_enc", "required": true}, {"type": "double",
+    "name": "air_temp_k", "required": true}, {"type": "double", "name": "process_temp_k",
+    "required": true}, {"type": "double", "name": "rpm", "required": true}, {"type":
+    "double", "name": "torque_nm", "required": true}, {"type": "double", "name": "tool_wear_min",
+    "required": true}, {"type": "double", "name": "temp_diff_k", "required": true},
+    {"type": "double", "name": "power_w", "required": true}, {"type": "double", "name":
+    "wear_torque", "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float32", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-11-09 08:15:37.352837'
