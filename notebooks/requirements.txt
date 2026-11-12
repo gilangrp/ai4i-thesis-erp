@@ -7,7 +7,7 @@ matplotlib
 scikit-learn
 xgboost
 imbalanced-learn          # SMOTE (imblearn.over_sampling)
-
+seaborn
 # ── MLflow (experiment tracking + model registry) ──────────────────────────────
 mlflow
 
