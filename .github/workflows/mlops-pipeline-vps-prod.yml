@@ -15,11 +15,11 @@ on:
   workflow_dispatch:
     inputs:
       dag_id:
-        description: 'DAG yang dipicu di Airflow VPS'
+        description: 'DAG triggered Airflow VPS'
         required: false
         default: 'etl_postgre_to_clickhouse_mfp'
 
-# Cegah dua run berjalan bersamaan (saling menimpa data/MLflow)
+#  prevent multiple runs of the same workflow at the same time, but allow new runs to be queued
 concurrency:
   group: mlops-pipeline-vps-prod
   cancel-in-progress: false
@@ -42,18 +42,18 @@ jobs:
 
       - name: 3. Trigger Airflow (VPS) -> Wait -> Train Notebook
         env:
-          # Semua dari GitHub Secrets, TANPA fallback hardcoded
-          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}   # contoh: http://IP_VPS:8080
+          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }} 
           AIRFLOW_USERNAME: ${{ secrets.AIRFLOW_USERNAME }}
           AIRFLOW_PASSWORD: ${{ secrets.AIRFLOW_PASSWORD }}
-          AIRFLOW_DAG_ID: ${{ inputs.dag_id || 'etl_postgre_to_clickhouse_mfp' }}
+          AIRFLOW_DAG_ID: ${{ secrets.AIRFLOW_DAG_ID }}
           CLICKHOUSE_HOST: ${{ secrets.CLICKHOUSE_HOST }}
           CLICKHOUSE_PORT: ${{ secrets.CLICKHOUSE_PORT }}
           CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
           CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
           CLICKHOUSE_DB: ${{ secrets.CLICKHOUSE_DB }}
           MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
-          # Pengaman kalau server MLflow di VPS tersendat
+
+          # safety if Airflow DAG is not triggered, retry 7 times with exponential backoff (3 seconds) and timeout 120 seconds
           MLFLOW_HTTP_REQUEST_MAX_RETRIES: "7"
           MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR: "3"
           MLFLOW_HTTP_REQUEST_TIMEOUT: "120"
