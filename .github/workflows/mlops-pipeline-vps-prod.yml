@@ -1,0 +1,73 @@
+name: MLOps CI/CD Pipeline (Airflow on VPS)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/mlops-pipeline-vps-prod.yml'
+      - 'dags/**'
+      - 'notebooks/**'
+      - 'serving/**'
+      - 'scripts/**'
+      - 'workflows/**'
+      - 'sql/**'
+      - 'requirements.txt'
+  workflow_dispatch:
+    inputs:
+      dag_id:
+        description: 'DAG yang dipicu di Airflow VPS'
+        required: false
+        default: 'etl_postgre_to_clickhouse_mfp'
+
+# Cegah dua run berjalan bersamaan (saling menimpa data/MLflow)
+concurrency:
+  group: mlops-pipeline-vps-prod
+  cancel-in-progress: false
+
+jobs:
+  run-pipeline:
+    name: Trigger Airflow VPS -> Train Notebook
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 3. Trigger Airflow (VPS) -> Wait -> Train Notebook
+        env:
+          # Semua dari GitHub Secrets, TANPA fallback hardcoded
+          AIRFLOW_BASE_URL: ${{ secrets.AIRFLOW_BASE_URL }}   # contoh: http://IP_VPS:8080
+          AIRFLOW_USERNAME: ${{ secrets.AIRFLOW_USERNAME }}
+          AIRFLOW_PASSWORD: ${{ secrets.AIRFLOW_PASSWORD }}
+          AIRFLOW_DAG_ID: ${{ inputs.dag_id || 'etl_postgre_to_clickhouse_mfp' }}
+          CLICKHOUSE_HOST: ${{ secrets.CLICKHOUSE_HOST }}
+          CLICKHOUSE_PORT: ${{ secrets.CLICKHOUSE_PORT }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+          CLICKHOUSE_DB: ${{ secrets.CLICKHOUSE_DB }}
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          # Pengaman kalau server MLflow di VPS tersendat
+          MLFLOW_HTTP_REQUEST_MAX_RETRIES: "7"
+          MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR: "3"
+          MLFLOW_HTTP_REQUEST_TIMEOUT: "120"
+        run: |
+          chmod +x workflows/airflow-to-mlflow/deploy_remote_vps_prod.sh
+          bash workflows/airflow-to-mlflow/deploy_remote_vps_prod.sh
+
+      - name: 4. Upload Artifacts (notebook hasil run + log Airflow)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-results
+          path: |
+            runs/*.ipynb
+            runs/airflow_*.json
+          if-no-files-found: warn
+          retention-days: 7
