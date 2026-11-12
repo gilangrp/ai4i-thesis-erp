@@ -9,13 +9,30 @@ mlflow ui --host 127.0.0.1 --port 5000
 # MLFlow server
 mlflow server --host 127.0.0.1 --port 5000
 
-# Include with mlflow ui
+# MLFlow UI Local server laptop/PC
 mlflow server \
   --host 127.0.0.1 \
   --port 5000 \
   --backend-store-uri sqlite:///mlflow.db \
   --default-artifact-root ./mlruns
 
+# MLFlow UI VPS deploy server (SUCCESS, mlartifacts has subfolder while mlruns has no subfolder)
+mlflow server \
+  --host 0.0.0.0 \
+  --port 5000 \
+  --backend-store-uri sqlite:///mlflow.db \
+  --artifacts-destination ./mlartifacts \
+  --serve-artifacts \
+  --allowed-hosts "202.10.42.115:5000,localhost:5000,127.0.0.1:5000" \
+  --cors-allowed-origins "http://202.10.42.115:5000"
+
+# MLFlow UI VPS deploy server (ERROR while upload artifact file)
+mlflow server --host 0.0.0.0 --port 5000 \
+  --host 0.0.0.0 \
+  --backend-store-uri sqlite:///mlflow.db \
+  --default-artifact-root ./mlruns \
+  --allowed-hosts "202.10.42.115:5000,localhost:5000,127.0.0.1:5000" \
+  --cors-allowed-origins "http://202.10.42.115:5000"
 
 # ==============================================================================
 # COMMAND UTILS IMPORTANT (CLICKHOUSE & POSTGRESQL)
