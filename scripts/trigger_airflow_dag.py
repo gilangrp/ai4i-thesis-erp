@@ -8,7 +8,7 @@ Env:
   AIRFLOW_API_VERSION  v2 (Airflow 3.x, token JWT)  | v1 (Airflow 2.x, basic auth)
   AIRFLOW_USERNAME / AIRFLOW_PASSWORD
   AIRFLOW_API_TOKEN    opsional; kalau diisi dipakai langsung sebagai Bearer
-  AIRFLOW_DAG_ID       default etl_oracle_to_clickhouse_mfp
+  AIRFLOW_DAG_ID       default etl_postgre_to_clickhouse_mfp
   DAG_WAIT_VISIBLE_S   default 180  (tunggu DAG ter-parse setelah file disalin)
   DAG_TIMEOUT_S        default 3600
 """
@@ -20,7 +20,7 @@ import requests
 
 BASE = os.environ["AIRFLOW_BASE_URL"].rstrip("/")
 VER = os.getenv("AIRFLOW_API_VERSION", "v2")
-DAG_ID = os.getenv("AIRFLOW_DAG_ID", "etl_oracle_to_clickhouse_mfp")
+DAG_ID = os.getenv("AIRFLOW_DAG_ID", "etl_postgre_to_clickhouse_mfp")
 WAIT_VISIBLE = int(os.getenv("DAG_WAIT_VISIBLE_S", "180"))
 TIMEOUT = int(os.getenv("DAG_TIMEOUT_S", "3600"))
 API = f"{BASE}/api/{VER}"
