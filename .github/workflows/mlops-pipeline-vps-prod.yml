@@ -1,4 +1,4 @@
-name: MLOps CI/CD Pipeline (Airflow on VPS)
+name: MLOps CI/CD Pipeline on VPS (Production)
 
 on:
   push:
