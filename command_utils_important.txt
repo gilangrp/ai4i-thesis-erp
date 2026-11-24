@@ -3,6 +3,10 @@
 # ==============================================================================
 ALTER USER postgres WITH PASSWORD 'admin';
 
+# delete airflow DAG etl_postgre_to_clickhouse_mfp
+airflow dags delete etl_postgre_to_clickhouse_mfp
+
+
 # MLFlow ui
 mlflow ui --host 127.0.0.1 --port 5000
 
