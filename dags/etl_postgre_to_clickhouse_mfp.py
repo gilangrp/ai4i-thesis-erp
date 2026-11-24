@@ -1,7 +1,7 @@
 """
 DAG: PostgreSQL -> ClickHouse (Machine Failure Prediction - Incremental Batch).
 
-Schedule: Runs automatically every 1 hour (schedule="@hourly").
+Schedule: Runs automatically every 20 minutes (schedule="*/20 * * * *").
 Workflow:
 1. Read BATCH_SIZE rows (default: 250) from public.machine_operation_staging in PostgreSQL.
 2. Append those rows to the ClickHouse table (erp_ai4i.machine_operation).
@@ -33,7 +33,7 @@ CH_CONN_ID = "clickhouse_mfp"
 PG_DATABASE = "erp_ai4i"
 PG_SCHEMA = "public"
 CH_DATABASE = "erp_ai4i"
-BATCH_SIZE = 250
+BATCH_SIZE = 5000
 PG_STAGING_TABLE = f"{PG_SCHEMA}.machine_operation_staging"
 PG_MAIN_TABLE = f"{PG_SCHEMA}.machine_operation"
 CH_TABLE = "machine_operation"
@@ -124,7 +124,7 @@ def _ch_client(timeout: int = 10):
 @dag(
     dag_id="etl_postgre_to_clickhouse_mfp",
     description="Incremental ETL: Fetch batch from PostgreSQL Staging, append to ClickHouse, move to main PostgreSQL table",
-    schedule="@hourly",  # Run automatically every 1 hour
+    schedule="*/20 * * * *",  # Run automatically every 20 minutes
     start_date=datetime(2026, 1, 1),  # DAG is active starting from this date
     catchup=False,  # Do not backfill missed runs since start_date
     max_active_runs=1,  # Only 1 DAG run allowed at a time to prevent race conditions
