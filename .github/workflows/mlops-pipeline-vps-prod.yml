@@ -2,7 +2,9 @@ name: MLOps CI/CD Pipeline on VPS (Production)
 
 on:
   push:
-    branches: [ main ]
+    # branches: [ main ]
+    branches: [ 'temp' ]
+
     paths:
       - '.github/workflows/mlops-pipeline-vps-prod.yml'
       - 'dags/**'
