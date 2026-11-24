@@ -2,8 +2,8 @@ name: MLOps CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
-    # branches: [ 'temp' ]
+    # branches: [ main ]
+    branches: [ 'temp' ]
     paths:
       - 'dags/**'
       - 'notebooks/**'
